@@ -1,7 +1,7 @@
 {
   "name": "1Day Focus & 脳内アラーム",
   "short_name": "1Day Focus",
-  "start_url": "preview.html",
+  "start_url": "index.html",
   "display": "standalone",
   "background_color": "#FF9A9E",
   "theme_color": "#FF4757",

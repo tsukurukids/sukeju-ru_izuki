@@ -1,0 +1,1412 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="manifest" href="manifest.json">
+    <link rel="icon" href="icon.svg" type="image/svg+xml">
+    <meta name="theme-color" content="#FF4757">
+    <title>1Day Focus & 脳内アラーム - インタラクティブ・プレビュー</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            /* 春: 桜色のグラデーション */
+            --primary: #FF4757;
+            --secondary: #2ED573;
+            --bg: #FF9A9E; 
+            --bg-bottom: #FAD0C4;
+            --text: #2D3436;
+            --card-bg: rgba(255, 255, 255, 0.85);
+            --transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        /* 夏: 青い空と海のグラデーション */
+        .theme-summer {
+            --primary: #00A8FF;
+            --bg: #00D2FF; 
+            --bg-bottom: #3A7BD5;
+        }
+
+        /* 秋: 夕焼けと紅葉のグラデーション */
+        .theme-autumn {
+            --primary: #E67E22;
+            --bg: #F093FB; 
+            --bg-bottom: #F5576C;
+        }
+
+        /* 冬: 夜空と雪のグラデーション */
+        .theme-winter {
+            --primary: #6C5CE7;
+            --bg: #A18CD1; 
+            --bg-bottom: #FBC2EB;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Outfit', sans-serif;
+        }
+
+        body {
+            background-color: var(--bg);
+            color: var(--text);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            transition: var(--transition);
+            overflow: hidden;
+        }
+
+        #phone-frame {
+            /* スマホの黒い枠（わく）を消して、画面にすっきり合わせる設定にしたよ */
+            width: 100%;
+            max-width: 480px;
+            height: 100vh;
+            background: linear-gradient(180deg, var(--bg) 0%, var(--bg-bottom, var(--bg)) 100%);
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        header {
+            padding: 40px 24px 12px;
+            /* 少し透きとおる白い背景にして、どの季節でも文字をくっきり見せるよ */
+            background: rgba(255, 255, 255, 0.7); 
+            backdrop-filter: blur(10px);
+            color: var(--text); 
+            border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+            position: relative;
+            z-index: 10;
+        }
+
+        .date-display {
+            font-size: 24px;
+            font-weight: 700;
+        }
+
+        .tab-content {
+            flex: 1;
+            padding: 8px 20px 20px; /* 上の余白を詰めてフォームを上に上げたよ */
+            overflow-y: auto;
+            position: relative;
+        }
+
+        /* Schedule View */
+        .task-list {
+            list-style: none;
+            padding-bottom: 120px; /* ゴミ箱ボタンとかぶらないための余白だよ */
+        }
+
+        .task-card {
+            background: var(--card-bg);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 16px;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            border: 1px solid rgba(255,255,255,0.3);
+            transition: var(--transition);
+            animation: slideUp 0.5s ease-out forwards;
+        }
+
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .task-time { font-weight: 600; color: var(--primary); margin-right: 15px; width: 50px; }
+        .task-info { flex: 1; }
+        .task-title { font-weight: 600; font-size: 16px; }
+
+        /* Tools View */
+        .tool-tab-switch {
+            display: flex;
+            background: rgba(0,0,0,0.05);
+            border-radius: 12px;
+            margin-bottom: 20px;
+            padding: 4px;
+        }
+
+        .tool-tab-btn {
+            flex: 1;
+            padding: 8px;
+            text-align: center;
+            border-radius: 8px;
+            font-size: 13px;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+
+        .tool-tab-btn.active {
+            background: white;
+            color: var(--primary);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+        }
+
+        .big-timer {
+            font-size: 64px;                      /* さらに大きくしたよ！ */
+            font-weight: 800;                     /* もっと太くて力強い文字にしたよ！ */
+            text-align: center;
+            margin: 20px 0;
+            color: var(--text);                   /* 季節に関係なく、一番見やすい濃い色にしたよ！ */
+            font-variant-numeric: tabular-nums; 
+            letter-spacing: 1px;                  /* 数字のすきまを少し広げて読みやすくしたよ！ */
+            text-shadow: 0 2px 8px rgba(0,0,0,0.08); /* 影をやさしく広げて見やすくしたよ！ */
+        }
+
+        /* タイマーや数字をのせる、見やすい背景パネルだよ */
+        .timer-panel {
+            background: rgba(255, 255, 255, 0.9); /* 白くて見やすい背景 */
+            border-radius: 24px;                  /* 角をまるくするよ */
+            padding: 24px 16px;                   /* 内側のよはい */
+            margin-bottom: 20px;                  /* 下のすきま */
+            border: 1px solid rgba(255, 255, 255, 0.5);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.05); /* かげをつけて立体的に */
+            text-align: center;
+        }
+
+        /* Nav */
+        nav {
+            height: 80px;
+            background: white; /* ボタンの後ろに動物が透けないようにしたよ */
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            border-top: 1px solid rgba(0,0,0,0.05);
+            position: relative;
+            z-index: 10;
+        }
+
+        .nav-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+            color: #333; /* もっと濃いグレーにして見やすくしたよ */
+            font-size: 10px;
+            font-weight: 700; /* 少し太くしたよ */
+            cursor: pointer;
+            transition: var(--transition);
+        }
+
+        .nav-item.active {
+            color: var(--primary);
+        }
+
+        .nav-item span { font-size: 10px; display: block; margin-top: 4px; }
+
+        /* Season Selector (for preview only) */
+        .season-swatches {
+            position: absolute;
+            right: -100px;
+            top: 50%;
+            transform: translateY(-50%);
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .swatch {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            cursor: pointer;
+            border: 3px solid white;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+
+        /* Mockup Overlay */
+        .mockup-img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            border-radius: 20px;
+        }
+        /* 予定を入力するフォームのデザイン */
+        .add-task-form {
+            background: white;
+            border-radius: 20px;
+            padding: 16px;
+            margin-bottom: 20px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            border: 1px solid rgba(0,0,0,0.05);
+            box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+            animation: slideUp 0.5s ease-out forwards;
+        }
+        .add-task-form input {
+            border: 1px solid #ddd;
+            padding: 10px;
+            border-radius: 12px;
+            font-size: 14px;
+            outline: none;
+            transition: var(--transition);
+        }
+        .add-task-form input:focus { border-color: var(--primary); }
+        .add-task-btn {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 12px;
+            font-weight: 700;
+            cursor: pointer;
+            flex: 1;
+            transition: var(--transition);
+        }
+        .add-task-btn:active { transform: scale(0.95); }
+
+        /* キラキラ・アニメーション背景 */
+        @keyframes sparkleBg {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+        .sparkle-body {
+            background: linear-gradient(-45deg, var(--bg), #ffffff, var(--bg), #ffffff);
+            background-size: 400% 400%;
+            animation: sparkleBg 15s ease infinite;
+        }
+
+        /* タイマー入力用のデザイン */
+        .timer-input-group {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 10px;
+        }
+        .timer-input {
+            width: 60px;
+            padding: 8px;
+            border-radius: 12px;
+            border: 1px solid #ddd;
+            text-align: center;
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--primary);
+            outline: none;
+        }
+        .timer-label { 
+            font-size: 16px;                      /* 少し大きくしたよ */
+            font-weight: 700;                     /* 太字にして見やすくしたよ */
+            color: var(--text);                   /* はっきり見える文字色にしたよ */
+            margin-left: 2px;
+            margin-right: 8px;
+        }
+
+        /* 色えらびのデザイン */
+        .color-picker {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10px;
+            padding: 10px;
+            margin-top: 10px;
+        }
+        .color-bubble {
+            width: 40px;
+            height: 40px;
+            border-radius: 14px;
+            cursor: pointer;
+            border: 3px solid white;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+            transition: var(--transition);
+        }
+        .color-bubble:active { transform: scale(0.9); }
+
+        /* アラーム通知のデザイン */
+        #alarm-overlay {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: var(--primary);
+            color: white;
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+            border-radius: 32px;
+            text-align: center;
+            animation: fadeIn 0.3s ease-out;
+            padding: 20px;
+        }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+        /* 季節のしるし（パーティクル）の設定 */
+        #bg-particles {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none;
+            z-index: 0;
+            overflow: hidden;
+        }
+        .particle {
+            position: absolute;
+            z-index: 1;
+            animation: fallParticle 10s linear infinite;
+            box-shadow: 0 0 5px rgba(255,255,255,0.3); /* 光がにじむ感じ */
+            border: 0.5px solid rgba(255,255,255,0.2); /* イラスト風のふちどり */
+            pointer-events: none; /* スマホやパソコンのタッチ・クリックを邪魔しないよ */
+        }
+        /* 15秒に一度光る特別なキラキラ */
+        .special-sparkle {
+            position: absolute;
+            width: 40px; height: 40px;
+            background: white;
+            clip-path: polygon(50% 0%, 61% 39%, 100% 50%, 61% 61%, 50% 100%, 39% 61%, 0% 50%, 39% 39%);
+            z-index: 2;
+            animation: sparklePulse 2s ease-out forwards;
+            pointer-events: none; /* クリックやタッチを邪魔しないよ */
+        }
+
+        /* タイマーが動いているときだけの全画面モードの設定だよ */
+        .timer-active-mode header,
+        .timer-active-mode .tool-tab-switch,
+        .timer-active-mode .timer-input-group {
+            display: none !important; /* ヘッダー、タブ切り替え、時間を選ぶ欄を隠すよ（メニューは隠さないよ） */
+        }
+        .timer-active-mode .tab-content {
+            padding: 20px;
+            display: flex;
+            flex-direction: column;   /* 数字とボタンを「たて」に並べるよ！ */
+            justify-content: center;
+            align-items: center;      /* 画面のまんなかにあわせるよ */
+            gap: 24px;                /* 数字とボタンのあいだに少しすき間をあけるよ */
+        }
+        .timer-active-mode .timer-panel {
+            background: transparent;
+            border: none;
+            box-shadow: none;
+            width: 100%;
+        }
+        .timer-active-mode .big-timer {
+            font-size: 108px;         /* 数字をさらに大きくして、もっと見やすくしたよ！ */
+        }
+        @keyframes sparklePulse {
+            0% { transform: scale(0) rotate(0deg); opacity: 0; }
+            50% { transform: scale(1.2) rotate(90deg); opacity: 1; }
+            100% { transform: scale(0) rotate(180deg); opacity: 0; }
+        }
+        @keyframes fallParticle {
+            0% { transform: translate(0, -50px) rotate(0deg); opacity: 0; }
+            10% { opacity: var(--p-opacity, 0.6); } /* JSで決めた透明度にするよ */
+            25% { transform: translate(60px, 200px) rotate(90deg); } /* 大きく揺らすよ */
+            50% { transform: translate(-60px, 400px) rotate(180deg); }
+            75% { transform: translate(60px, 600px) rotate(270deg); }
+            90% { opacity: var(--p-opacity, 0.6); }
+            100% { transform: translate(0, 800px) rotate(360deg); opacity: 0; }
+        }
+    </style>
+</head>
+<body id="body" class="sparkle-body">
+
+    <div id="phone-frame">
+        <div id="bg-particles"></div> <!-- 季節のしるしが降るよ -->
+        <header id="app-header">
+            <div class="date-display" id="date-label">2026/04/10 (fri)</div>
+            <div id="clock-mini" style="font-size: 18px; font-weight: 600; opacity: 0.8; margin-top: 4px;">00:00:00</div>
+        </header>
+
+        <main class="tab-content" id="main-content">
+            <!-- ここに中身が出るよ -->
+        </main>
+
+        <nav>
+            <div class="nav-item active" onclick="showTab('schedule')">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+                <span>スケジュール</span>
+            </div>
+            <div class="nav-item" onclick="showTab('tools')">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                <span>ツール</span>
+            </div>
+            <div class="nav-item" onclick="showTab('settings')">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+                <span>設定</span>
+            </div>
+        </nav>
+        <!-- 画面に固定されるゴミ箱コンテナ -->
+        <div id="trash-container" style="position:absolute; bottom:85px; right:15px; display:flex; flex-direction:column; align-items:flex-end; z-index:200;"></div>
+        <!-- アラームのときに出る画面 -->
+        <div id="alarm-overlay">
+            <div style="font-size: 64px; margin-bottom: 20px;">🎒</div>
+            <div style="font-size: 28px; font-weight: 700; margin-bottom: 10px;">時間だよ！</div>
+            <div id="alarm-msg" style="font-size: 18px; margin-bottom: 30px;">予定の時間になりました</div>
+            <button onclick="closeAlarm()" style="padding: 12px 40px; border-radius: 20px; border: none; background: white; color: var(--primary); font-weight: 700; cursor: pointer; font-size: 18px; box-shadow: 0 5px 15px rgba(0,0,0,0.2);">了解！</button>
+        </div>
+
+        <!-- タイマー用のアラーム画面 -->
+        <div id="timer-alarm-overlay" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: var(--secondary); color: white; display: none; flex-direction: column; justify-content: center; align-items: center; z-index: 150; border-radius: 32px; text-align: center; animation: fadeIn 0.3s ease-out; padding: 20px;">
+            <div style="font-size: 64px; margin-bottom: 20px;">⏰</div>
+            <div style="font-size: 28px; font-weight: 700; margin-bottom: 10px;">時間だよ！</div>
+            <div style="font-size: 16px; margin-bottom: 30px;">15秒以内に止めないと<br>5分後にスヌーズするよ</div>
+            <div style="display: flex; gap: 12px; justify-content: center; width: 100%; max-width: 280px;">
+                <!-- 完全にタイマーを止めるボタンだよ -->
+                <button onclick="closeTimerAlarm()" style="flex: 1; padding: 12px 20px; border-radius: 20px; border: none; background: white; color: var(--secondary); font-weight: 700; cursor: pointer; font-size: 16px; box-shadow: 0 5px 15px rgba(0,0,0,0.2);">ストップ</button>
+                <!-- すぐにスヌーズ（5分後に再スタート）を開始するボタンだよ -->
+                <button onclick="snoozeTimer()" style="flex: 1; padding: 12px 20px; border-radius: 20px; border: 2px solid white; background: transparent; color: white; font-weight: 700; cursor: pointer; font-size: 16px; box-shadow: 0 5px 15px rgba(0,0,0,0.1);">スヌーズ</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="season-swatches">
+        <div class="swatch" style="background:#FF6B81;" onclick="changeTheme('spring')"></div>
+        <div class="swatch" style="background:#2E86DE;" onclick="changeTheme('summer')"></div>
+        <div class="swatch" style="background:#D35400;" onclick="changeTheme('autumn')"></div>
+        <div class="swatch" style="background:#4834D4;" onclick="changeTheme('winter')"></div>
+    </div>
+
+    <script>
+        /* --- データ管理の魔法（localStorage） --- */
+        let tasks = [];
+        try {
+            tasks = JSON.parse(localStorage.getItem('tasks')) || [
+                { time: "09:00", title: "朝の散歩", info: "公園の入り口", notified: false }
+            ];
+            if (!Array.isArray(tasks)) tasks = [{ time: "09:00", title: "朝の散歩", info: "公園の入り口", notified: false }];
+        } catch (e) {
+            tasks = [{ time: "09:00", title: "朝の散歩", info: "公園の入り口", notified: false }];
+        }
+
+        // 毎日のくりかえし予定をためておく場所だよ
+        let repeatingTasks = [];
+        try {
+            repeatingTasks = JSON.parse(localStorage.getItem('repeatingTasks')) || [];
+            if (!Array.isArray(repeatingTasks)) repeatingTasks = [];
+        } catch (e) {
+            repeatingTasks = [];
+        }
+
+        // 消した予定をためておく場所（24時間で消えるよ）
+        let deletedTasks = [];
+        try {
+            deletedTasks = JSON.parse(localStorage.getItem('deletedTasks')) || [];
+            if (!Array.isArray(deletedTasks)) deletedTasks = [];
+        } catch (e) {
+            deletedTasks = [];
+        }
+        
+        // --- サブ設定の魔法 ---
+        let preAlarmMinutes = parseInt(localStorage.getItem('preAlarmMinutes')) || 0;
+        let showSparkles = localStorage.getItem('showSparkles') !== 'false'; // デフォルトはtrue
+        
+        let primaryColor = localStorage.getItem('primaryColor') || '#FFB7C5';
+        let allowExtraTasks = localStorage.getItem('allowExtraTasks') === 'true'; // 予定を増やす設定だよ
+        let useWeeklyFeature = localStorage.getItem('useWeeklyFeature') !== 'false'; // めあて・振り返り機能だよ
+        let weeklyGoal = localStorage.getItem('weeklyGoal') || '';
+        let weeklyReflection = localStorage.getItem('weeklyReflection') || '';
+
+        let reflectionHistory = [];
+        try {
+            reflectionHistory = JSON.parse(localStorage.getItem('reflectionHistory')) || [];
+            if (!Array.isArray(reflectionHistory)) reflectionHistory = [];
+        } catch (e) {
+            reflectionHistory = [];
+        }
+
+        let taskHistory = [];
+        try {
+            const storedHistory = JSON.parse(localStorage.getItem('taskHistory')) || [];
+            if (Array.isArray(storedHistory)) {
+                // 古いオブジェクト形式の履歴があれば文字列（タイトル）に自動変換するよ
+                taskHistory = storedHistory.map(item => {
+                    if (typeof item === 'object' && item !== null && item.title) {
+                        return item.title;
+                    }
+                    return typeof item === 'string' ? item : '';
+                }).filter(title => title !== '');
+            }
+        } catch (e) {
+            taskHistory = [];
+        }
+
+        // --- 日付が変わったら予定を全部リセットする魔法 ---
+        const todayStr = new Date().toDateString(); // 今日の日付（文字）
+        const lastDate = localStorage.getItem('lastDate'); // 前に開いたときの日付
+        
+        if (lastDate && lastDate !== todayStr) {
+            const todayDOW = new Date().getDay(); // 0:日, 1:月...6:土
+            
+            // 履歴に前日の予定（リセットされる予定）の文字だけを追加するよ
+            tasks.forEach(t => {
+                if (t.repeatType === 'none' && !t.isRepeating) {
+                    // 同じ予定がすでにあれば一回消してから先頭に追加するよ（重複を防ぐよ）
+                    const idx = taskHistory.indexOf(t.title);
+                    if (idx > -1) taskHistory.splice(idx, 1);
+                    taskHistory.unshift(t.title);
+                }
+            });
+            if (taskHistory.length > 50) taskHistory = taskHistory.slice(0, 50);
+            localStorage.setItem('taskHistory', JSON.stringify(taskHistory));
+
+            // 日付が変わっていたら、くりかえしの予定をセットするよ！
+            tasks = repeatingTasks.filter(rt => {
+                if (rt.repeatType === 'daily') return true; // 毎日はいつでも
+                if (rt.repeatType === 'weekly' && rt.dayOfWeek === todayDOW) return true; // 毎曜日は同じ曜日だけ
+                if (rt.isRepeating === true) return true; // 前のバージョンで作った「毎日」も対応するよ
+                return false;
+            }).map(rt => ({ ...rt, notified: false }));
+            saveTasks();
+        }
+        localStorage.setItem('lastDate', todayStr); // 今日の日付を覚えさせるよ
+
+        // --- 週が変わったら「めあて」をリセットして履歴に保存する魔法 ---
+        function getWeekId(d) {
+            const tempDate = new Date(d.getTime());
+            tempDate.setDate(tempDate.getDate() + 4 - (tempDate.getDay() || 7));
+            const yearStart = new Date(tempDate.getFullYear(), 0, 1);
+            const weekNo = Math.ceil((((tempDate - yearStart) / 86400000) + 1) / 7);
+            return tempDate.getFullYear() + "-W" + weekNo;
+        }
+        const currentWeekId = getWeekId(new Date());
+        const lastWeekId = localStorage.getItem('lastWeekId');
+        if (lastWeekId && lastWeekId !== currentWeekId) {
+            // 週が変わったら前の週のデータを履歴に入れるよ
+            if (weeklyGoal || weeklyReflection) {
+                reflectionHistory.unshift({ week: lastWeekId, goal: weeklyGoal, ref: weeklyReflection });
+                localStorage.setItem('reflectionHistory', JSON.stringify(reflectionHistory));
+            }
+            weeklyGoal = ''; // めあてをリセット！
+            weeklyReflection = ''; // 振り返りをリセット！
+            localStorage.setItem('weeklyGoal', '');
+            localStorage.setItem('weeklyReflection', '');
+        }
+        localStorage.setItem('lastWeekId', currentWeekId);
+        
+        // 色と背景を適用する
+        document.documentElement.style.setProperty('--primary', primaryColor);
+        if (!showSparkles) document.getElementById('body').classList.remove('sparkle-body');
+
+        /* タイマー・SW用の変数 */
+        let timerSeconds = 0;
+        let timerInterval = null;
+
+        let swCentiseconds = 0; // 0.01秒（センチ秒）単位で管理するよ
+        let swInterval = null;
+        let particleInterval = null; // 背景のしるしを出すタイマーだよ
+        let sparkleInterval = null; // 夏のキラキラタイマーだよ
+        let snoozeTimeout = null; // スヌーズ待ちのタイマーだよ
+        let isSnoozing = false; // 今スヌーズ中かどうかだよ
+        
+        // --- 音の魔法 ---
+        let audioCtx = null;
+        let soundInterval = null;
+        
+        let currentTab = 'schedule';
+        let currentToolTab = 'timer'; // 時計を無くしたのでデフォルトをタイマーにするよ
+        let isTrashOpen = false; // ゴミ箱が開いているかどうかの状態
+        let isTaskFormOpen = true; // 予定を書く欄が開いているかどうかの状態
+        let isHistoryOpen = false; // 履歴が開いているかどうかの状態
+        let currentAlarmingTaskIndex = -1; // 今アラームが鳴っている予定の番号だよ
+
+        /* --- 画面を表示する関数 --- */
+        function showTab(tab) {
+            currentTab = tab;
+            document.querySelectorAll('.nav-item').forEach((item, idx) => {
+                const tabs = ['schedule', 'tools', 'settings'];
+                item.classList.toggle('active', tabs[idx] === tab);
+            });
+
+            if (tab === 'schedule') renderSchedule();
+            else {
+                // スケジュール以外ではゴミ箱を隠す
+                document.getElementById('trash-container').innerHTML = '';
+                if (tab === 'tools') renderTools();
+                else if (tab === 'settings') renderSettings();
+            }
+            updateTimerMode(); // タブが切り替わったら全画面にするかチェックするよ
+        }
+
+        /* --- 1. スケジュール画面 --- */
+        function renderSchedule() {
+            // ゴミ箱をきれいにする魔法だよ
+            const now = new Date();
+            const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+            const currentDay = now.getDay(); // 0:日, 1:月, ...
+
+            // スクロールで時間を選べるように選択肢を自動で作るよ
+            const hOptions = Array.from({length: 24}, (_, i) => {
+                const val = String(i).padStart(2, '0');
+                return `<option value="${val}">${val}</option>`;
+            }).join('');
+            const mOptions = Array.from({length: 60}, (_, i) => {
+                const val = String(i).padStart(2, '0');
+                return `<option value="${val}">${val}</option>`;
+            }).join('');
+
+            // --- 週の目標表示 ---
+            let weeklyHTML = '';
+            if (useWeeklyFeature) {
+                weeklyHTML += `
+                    <div style="background:rgba(255,255,255,0.6); backdrop-filter:blur(5px); border-radius:15px; padding:10px 14px; margin-bottom:15px; border:1px dashed var(--primary); animation: slideUp 0.5s ease-out;">
+                        <div style="font-weight:bold; color:var(--primary); font-size:12px; margin-bottom:4px;">🎯 今週の目標</div>
+                        <textarea id="weekly-goal-input" oninput="saveWeeklyGoal(this.value)" placeholder="今週の目標は？" style="width:100%; border:none; background:transparent; font-size:14px; outline:none; resize:none; min-height:44px; padding:4px 0; line-height:1.4; display:block;">${weeklyGoal}</textarea>
+                    </div>
+                `;
+            }
+            
+            // 1. 日付が変わっていたら古いものはバイバイ！
+            deletedTasks = deletedTasks.filter(item => item.deletedAt >= todayStart);
+
+            // 2. ゴミ箱が7個を超えていたら、予定の時間（time）が早いものから順番に消して7個までにするよ！
+            if (deletedTasks.length > 7) {
+                // 予定の時間（08:00とか）が早い順に並び替えるよ
+                deletedTasks.sort((a, b) => a.time.localeCompare(b.time));
+                // 最初の方（時間が早いもの）を切り捨てて、遅い時間の方から7個だけ残すよ
+                deletedTasks = deletedTasks.slice(deletedTasks.length - 7);
+            }
+            
+            saveDeletedTasks();
+
+            const listHTML = tasks.map((task, index) => `
+                <div class="task-card" style="animation-delay: ${index * 0.1}s">
+                    <div class="task-time">${task.time}</div>
+                    <div class="task-info">
+                        <div class="task-title">${(task.repeatType === 'daily' || task.isRepeating) ? '🔁 ' : ''}${task.repeatType === 'weekly' ? '📅 ' : ''}${task.title}</div>
+                        <div style="font-size:12px;opacity:0.6;">${task.info || '予定だよ'}</div>
+                    </div>
+                    <div style="color:var(--primary); cursor:pointer;" onclick="deleteTask(${index})">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                    </div>
+                </div>
+            `).join('');
+
+            // ゴミ箱（ふっかつリスト）の表示
+            const trashHTML = deletedTasks.map((task, index) => `
+                <div style="background:var(--card-bg); backdrop-filter:blur(5px); border:1px solid rgba(255,255,255,0.5); color:var(--text); border-radius:15px; padding:6px 12px; margin-bottom:8px; font-size:11px; box-shadow:0 4px 10px rgba(0,0,0,0.05); display:flex; align-items:center; cursor:pointer;" onclick="restoreTask(${index})">
+                    <span style="margin-right:8px; opacity:0.8;">${task.time} ${task.title}</span>
+                    <span style="color:var(--primary); font-weight:bold;">↺</span>
+                </div>
+            `).join('');
+
+            document.getElementById('main-content').innerHTML = `
+                ${weeklyHTML}
+                <div class="add-task-form">
+                    <div style="width:100%; display:flex; justify-content:space-between; align-items:center; cursor:pointer;" onclick="toggleTaskForm()">
+                        <span style="font-weight:bold; color:var(--primary);">✏️ 予定を書く</span>
+                        <span style="color:var(--primary); font-weight:bold;">${isTaskFormOpen ? '▲' : '▼'}</span>
+                    </div>
+                    ${isTaskFormOpen ? `
+                    <div style="width:100%; display:flex; flex-wrap:wrap; gap:10px; margin-top:10px; animation: fadeIn 0.3s ease-out; align-items:center;">
+                        <select id="task-time-h" class="timer-input" style="flex:1; appearance: none; -webkit-appearance: none; text-align-last: center; font-size:16px; padding:10px;">${hOptions}</select>
+                        <span style="font-weight:bold; color:var(--primary);">:</span>
+                        <select id="task-time-m" class="timer-input" style="flex:1; appearance: none; -webkit-appearance: none; text-align-last: center; font-size:16px; padding:10px;">${mOptions}</select>
+                        <input type="text" id="task-title" placeholder="なにをする？" style="flex:2;" onclick="toggleHistory(event)">
+                        <select id="task-repeat-type" class="timer-input" style="flex:1; font-size:14px; padding:8px; border-radius:12px; background-color:white; border:2px solid var(--primary); cursor:pointer;">
+                            <option value="none">くりかえしなし</option>
+                            <option value="daily">毎日</option>
+                            <option value="weekly">毎曜日</option>
+                        </select>
+                        <button class="add-task-btn" onclick="addTask()">追加</button>
+                    </div>
+                    ` : ''}
+                </div>
+                <div id="history-container" style="display: ${isHistoryOpen ? 'block' : 'none'};"></div>
+                <div class="task-list">${listHTML || '<div style="text-align:center; opacity:0.3; padding:20px;">予定がありません</div>'}</div>
+            `;
+
+            if (isHistoryOpen) {
+                renderHistoryList();
+            }
+
+            const trashContainer = document.getElementById('trash-container');
+            if (deletedTasks.length > 0 && currentTab === 'schedule') {
+                trashContainer.innerHTML = `
+                    <div id="trash-list" style="display:${isTrashOpen ? 'flex' : 'none'}; flex-direction:column; align-items:flex-end; margin-bottom:8px; animation:slideUp 0.3s ease-out;">
+                        ${trashHTML}
+                    </div>
+                    <div onclick="toggleTrash()" style="width:40px; height:40px; background:var(--card-bg); backdrop-filter:blur(10px); color:var(--primary); border:1px solid rgba(255,255,255,0.3); border-radius:50%; display:flex; justify-content:center; align-items:center; font-size:20px; cursor:pointer; box-shadow:0 8px 32px rgba(0,0,0,0.05); transition:var(--transition); transform: ${isTrashOpen ? 'rotate(15deg)' : 'none'};">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                    </div>
+                `;
+            } else {
+                trashContainer.innerHTML = '';
+            }
+        }
+
+        function toggleTrash() {
+            isTrashOpen = !isTrashOpen;
+            renderSchedule();
+        }
+
+        // 予定を書く欄を開いたり閉じたりする魔法（関数）
+        function toggleTaskForm() {
+            isTaskFormOpen = !isTaskFormOpen; // 開いていたら閉じる、閉じていたら開く
+            if (!isTaskFormOpen) {
+                isHistoryOpen = false; // 閉じたときは履歴も閉じるよ！
+            }
+            renderSchedule(); // 画面を描き直す
+        }
+
+        function toggleRefInput() {
+            const c = document.getElementById('ref-input-container');
+            c.style.display = c.style.display === 'none' ? 'block' : 'none';
+        }
+
+        function addTask() {
+            const hVal = document.getElementById('task-time-h').value;
+            const mVal = document.getElementById('task-time-m').value;
+            const timeVal = `${hVal}:${mVal}`;
+            const titleVal = document.getElementById('task-title').value;
+            const repeatTypeVal = document.getElementById('task-repeat-type').value; // くりかえしの種類
+            
+            // スケジュールの最大数を決めるよ（スイッチが入っていたら20個、入っていなかったら15個）
+            const maxTasks = allowExtraTasks ? 20 : 15;
+
+            // スケジュールがいっぱいにならないようにチェックする魔法だよ！
+            if (tasks.length >= maxTasks) {
+                alert(`スケジュールは1日に${maxTasks}個までだよ。どれか消してから追加してね！`);
+                return; // 制限いっぱいなら、ここでストップして追加しないよ
+            }
+
+            if (timeVal && titleVal) {
+                const newTask = { 
+                    time: timeVal, 
+                    title: titleVal, 
+                    notified: false, 
+                    repeatType: repeatTypeVal,
+                    dayOfWeek: new Date().getDay() // 今日の曜日を保存しておくよ
+                };
+                tasks.push(newTask);
+                tasks.sort((a, b) => a.time.localeCompare(b.time));
+                saveTasks();
+                
+                // もし「くりかえし」なら、くりかえしリストにも追加するよ
+                if (repeatTypeVal !== 'none') {
+                    repeatingTasks.push(newTask);
+                    saveRepeatingTasks();
+                }
+
+                renderSchedule();
+                
+                // 入力したあと、文字を消してスッキリさせるよ
+                document.getElementById('task-title').value = '';
+                document.getElementById('task-repeat-type').value = 'none'; // メニューもリセットするよ
+            }
+        }
+
+        function deleteTask(index) {
+            if(confirm("消してもいい？")) {
+                const item = tasks.splice(index, 1)[0];
+                
+                // もし「くりかえし」の予定だったら、くりかえしリストからも消してあげるよ
+                if (item.repeatType === 'daily' || item.repeatType === 'weekly' || item.isRepeating) {
+                    repeatingTasks = repeatingTasks.filter(rt => rt.time !== item.time || rt.title !== item.title);
+                    saveRepeatingTasks();
+                }
+
+                // 消した時刻をくっつけてゴミ箱にポイ！
+                item.deletedAt = Date.now();
+                deletedTasks.unshift(item); // 上に追加
+                saveTasks();
+                saveDeletedTasks();
+                renderSchedule();
+            }
+        }
+
+        function restoreTask(index) {
+            const item = deletedTasks.splice(index, 1)[0];
+            delete item.deletedAt; // 削除時刻はもういらない
+            item.notified = false; // 通知もリセット
+            tasks.push(item);
+            tasks.sort((a, b) => a.time.localeCompare(b.time));
+            saveTasks();
+            
+            // もし「くりかえし」の予定だったら、くりかえしリストにも戻してあげるよ
+            if (item.repeatType === 'daily' || item.repeatType === 'weekly' || item.isRepeating) {
+                const exists = repeatingTasks.some(rt => rt.time === item.time && rt.title === item.title);
+                if (!exists) {
+                    repeatingTasks.push({ ...item, notified: false });
+                    saveRepeatingTasks();
+                }
+            }
+
+            saveDeletedTasks();
+            isTrashOpen = false; // 復活させたらゴミ箱を閉じる（リセット）
+            renderSchedule();
+        }
+
+        function saveTasks() { localStorage.setItem('tasks', JSON.stringify(tasks)); }
+        function saveDeletedTasks() { localStorage.setItem('deletedTasks', JSON.stringify(deletedTasks)); }
+        function saveRepeatingTasks() { localStorage.setItem('repeatingTasks', JSON.stringify(repeatingTasks)); }
+        
+        function saveWeeklyGoal(v) { weeklyGoal = v; localStorage.setItem('weeklyGoal', v); }
+        function saveWeeklyRef(v) { weeklyReflection = v; localStorage.setItem('weeklyReflection', v); }
+
+        /* --- 2. ツール画面 --- */
+        function renderTools() {
+            const getActive = (t) => currentToolTab === t ? 'active' : '';
+            
+            // スクロールで選べるように、選択肢のオプションを自動で作るよ
+            /* 24個の選択肢にすることで、0時から最大23時まで選べるようにするよ */
+            const hOptions = Array.from({length: 24}, (_, i) => `<option value="${i}">${i}</option>`).join('');
+            const msOptions = Array.from({length: 60}, (_, i) => `<option value="${i}">${i}</option>`).join('');
+            
+            let toolContent = '';
+            if (currentToolTab === 'timer') {
+                toolContent = `
+                    <div class="timer-panel">
+                        <div class="timer-input-group">
+                            <select id="timer-h" class="timer-input" style="appearance: none; -webkit-appearance: none; text-align-last: center;">${hOptions}</select> <span class="timer-label">時</span>
+                            <select id="timer-m" class="timer-input" style="appearance: none; -webkit-appearance: none; text-align-last: center;">${msOptions}</select> <span class="timer-label">分</span>
+                            <select id="timer-s" class="timer-input" style="appearance: none; -webkit-appearance: none; text-align-last: center;">${msOptions}</select> <span class="timer-label">秒</span>
+                        </div>
+                        <div class="big-timer" id="timer-display">${formatTime(timerSeconds || 0)}</div>
+                    </div>
+                    <div style="display:flex; gap:16px; align-items:center;">
+                        <!-- タイマーの開始・一時停止ボタン -->
+                        <button onclick="toggleTimer()" style="flex:1; padding:16px; border-radius:16px; border:none; background:var(--primary); color:white; font-weight:700; cursor:pointer;">
+                            ${timerInterval ? '一時停止' : '開始'}
+                        </button>
+                        <!-- カウントダウン中も✖ボタンを表示するよ。ただし、一時停止（timerInterval === null）のときだけおせる設定にするよ -->
+                        ${timerSeconds > 0 ? `
+                        <button onclick="resetTimer()" 
+                                ${timerInterval !== null ? 'disabled' : ''} 
+                                style="width:52px; height:52px; border-radius:16px; border:none; background:#ff4757; color:white; font-weight:700; cursor:pointer; font-size:20px; display:flex; justify-content:center; align-items:center; line-height:1; 
+                                       opacity: ${timerInterval !== null ? '0.4' : '1'}; 
+                                       cursor: ${timerInterval !== null ? 'not-allowed' : 'pointer'};">
+                            ✖
+                        </button>
+                        ` : ''}
+                    </div>
+                    ${isSnoozing ? `
+                    <button onclick="resetTimer()" style="width:100%; margin-top:16px; padding:12px; border-radius:12px; border:none; background:#ff4757; color:white; font-weight:700; cursor:pointer; animation: fadeIn 0.3s ease-out;">
+                        スヌーズをキャンセル
+                    </button>
+                    ` : ''}
+                `;
+            } else if (currentToolTab === 'sw') {
+                toolContent = `
+                    <div class="timer-panel">
+                        <div style="font-size:14px; color:var(--primary); font-weight:700; margin-bottom:10px;">ストップウォッチ</div>
+                        <div class="big-timer" id="sw-display" style="font-size:54px;">${formatSW(swCentiseconds)}</div>
+                    </div>
+                    <div style="display:flex; gap:16px;">
+                        <button onclick="toggleSW()" style="flex:1; padding:16px; border-radius:16px; border:none; background:var(--primary); color:white; font-weight:700; cursor:pointer;">
+                            ${swInterval ? '停止' : '開始'}
+                        </button>
+                        <button onclick="resetSW()" style="padding:16px; border-radius:16px; border:2px solid var(--primary); background:white; color:var(--primary); font-weight:700; cursor:pointer;">リセット</button>
+                    </div>
+                `;
+            }
+
+            document.getElementById('main-content').innerHTML = `
+                <div class="tool-tab-switch">
+                    <div class="tool-tab-btn ${getActive('timer')}" onclick="switchTool('timer')">タイマー</div>
+                    <div class="tool-tab-btn ${getActive('sw')}" onclick="switchTool('sw')">SW</div>
+                </div>
+                ${toolContent}
+            `;
+        }
+
+        function switchTool(t) { currentToolTab = t; renderTools(); }
+
+        /* 時間の表示を計算する魔法 */
+        function formatTime(s) {
+            const h = Math.floor(s / 3600);
+            const m = Math.floor((s % 3600) / 60);
+            const sec = s % 60;
+            return (h > 0 ? String(h).padStart(2,'0')+':' : '') + String(m).padStart(2,'0')+':'+String(sec).padStart(2,'0');
+        }
+
+        function formatSW(cs) {
+            const h = Math.floor(cs / 360000);
+            const m = Math.floor((cs % 360000) / 6000);
+            const s = Math.floor((cs % 6000) / 100);
+            const dot = cs % 100;
+            const hStr = h > 0 ? String(h).padStart(2,'0')+':' : '';
+            const dotStr = String(dot).padStart(2,'0');
+            return hStr + String(m).padStart(2,'0')+':'+String(s).padStart(2,'0') + `<span style="font-size:32px; opacity:0.6">.${dotStr}</span>`;
+        }
+
+        function toggleTimer() {
+            if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+            else {
+                if (timerSeconds === 0) {
+                    /* 時・分・秒をそれぞれ秒になおして、すべて足し算するよ */
+                    timerSeconds = (parseInt(document.getElementById('timer-h').value)||0)*3600 + (parseInt(document.getElementById('timer-m').value)||0)*60 + (parseInt(document.getElementById('timer-s').value)||0);
+                }
+                if (timerSeconds > 0) {
+                    timerInterval = setInterval(() => {
+                        timerSeconds--;
+                        if (currentTab === 'tools' && currentToolTab === 'timer') document.getElementById('timer-display').innerText = formatTime(timerSeconds);
+                        if (timerSeconds <= 0) { 
+                            clearInterval(timerInterval); 
+                            timerInterval = null; 
+                            showTimerAlarm(); // アラーム画面を出すよ
+                            isSnoozing = false; // 鳴り始めたらスヌーズ状態は解除するよ
+                            updateTimerMode(); // 全画面モードを解除するよ
+                            renderTools(); 
+                        }
+                    }, 1000);
+                }
+            }
+            updateTimerMode(); // 全画面モードを切り替えるよ
+            renderTools();
+        }
+        function resetTimer() { 
+            clearInterval(timerInterval); 
+            timerInterval = null; 
+            timerSeconds = 0; 
+            isSnoozing = false; // スヌーズもキャンセル！
+            closeTimerAlarm(); // アラームも消すよ
+            updateTimerMode(); // 全画面モードを解除するよ
+            renderTools(); 
+        }
+
+        function updateTimerMode() {
+            const frame = document.getElementById('phone-frame');
+            /* タイマーが始まっていて（timerSeconds > 0）、かつ「ツール」タブを開いているときだけ全画面モードにするよ（一時停止でも全画面のまま！） */
+            if (timerSeconds > 0 && currentTab === 'tools') {
+                frame.classList.add('timer-active-mode');
+            } else {
+                frame.classList.remove('timer-active-mode');
+            }
+        }
+
+
+
+        function showTimerAlarm() {
+            document.getElementById('timer-alarm-overlay').style.display = 'flex';
+            playAlarmSound(); // 音を鳴らすよ！
+            // 15秒たっても止めなかったらスヌーズする魔法
+            snoozeTimeout = setTimeout(() => {
+                snoozeTimer();
+            }, 15000);
+        }
+
+        function closeTimerAlarm() {
+            document.getElementById('timer-alarm-overlay').style.display = 'none';
+            stopAlarmSound(); // 音を止めるよ！
+            if (snoozeTimeout) {
+                clearTimeout(snoozeTimeout);
+                snoozeTimeout = null;
+            }
+        }
+
+        function snoozeTimer() {
+            closeTimerAlarm();
+            timerSeconds = 300; // 5分（300秒）にセット
+            isSnoozing = true; // スヌーズ中だよ！
+            toggleTimer(); // タイマーを再開！
+        }
+
+        function toggleSW() {
+            if (swInterval) { clearInterval(swInterval); swInterval = null; }
+            else {
+                swInterval = setInterval(() => {
+                    swCentiseconds++;
+                    /* 99時間（35,640,000センチ秒）になったらリセットするよ！ */
+                    if (swCentiseconds >= 35640000) {
+                        resetSW();
+                        alert("99時間たったので、自動でリセットしたよ！");
+                        return;
+                    }
+                    if (currentTab === 'tools' && currentToolTab === 'sw') {
+                        document.getElementById('sw-display').innerHTML = formatSW(swCentiseconds);
+                    }
+                }, 10); /* 0.01秒（10ミリ秒）ごとに進めるよ */
+            }
+            renderTools();
+        }
+        function resetSW() { clearInterval(swInterval); swInterval = null; swCentiseconds = 0; renderTools(); }
+
+        /* --- 3. 設定画面 --- */
+        function renderSettings() {
+            const colors = ['#FFB7C5', '#4FC3F7', '#FF7043', '#9FA8DA', '#90EE90', '#FFD54F', '#BA68C8', '#2D3436'];
+            const bubbles = colors.map(c => `<div class="color-bubble" style="background:${c}" onclick="setMainColor('${c}')"></div>`).join('');
+            
+            document.getElementById('main-content').innerHTML = `
+                <div style="background:var(--card-bg); border-radius:20px; padding:20px; margin-bottom:20px;">
+                    <div style="font-weight:700; margin-bottom:10px;">アプリの色を選ぼう</div>
+                    <div class="color-picker">${bubbles}</div>
+                </div>
+
+                <div style="background:var(--card-bg); border-radius:20px; padding:20px;">
+                    <div style="font-weight:700; margin-bottom:16px;">サブ設定</div>
+                    
+
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+                        <div style="font-size:14px;">キラキラ背景</div>
+                        <input type="checkbox" ${showSparkles ? 'checked' : ''} onchange="toggleSparkles(this.checked)" style="width:20px; height:20px; accent-color:var(--primary);">
+                    </div>
+
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+                        <div style="font-size:14px;">予定を20個までにする</div>
+                        <input type="checkbox" ${allowExtraTasks ? 'checked' : ''} onchange="toggleExtraTasks(this.checked)" style="width:20px; height:20px; accent-color:var(--primary);">
+                    </div>
+
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+                        <div style="font-size:14px;">一週間の目標・振り返り</div>
+                        <input type="checkbox" ${useWeeklyFeature ? 'checked' : ''} onchange="toggleWeeklyFeature(this.checked)" style="width:20px; height:20px; accent-color:var(--primary);">
+                    </div>
+
+                    ${useWeeklyFeature ? `
+                    <div style="border-top:1px solid #eee; padding-top:16px; margin-top:16px;">
+                        <div style="font-weight:700; margin-bottom:8px; font-size:14px; color:var(--primary);">🌟 今週の振り返りを書く</div>
+                        <textarea oninput="saveWeeklyRef(this.value)" placeholder="今週はどうだったかな？" style="width:100%; border:1px solid #eee; border-radius:10px; padding:10px; font-size:13px; outline:none; resize:none; min-height:80px; display:block;">${weeklyReflection}</textarea>
+                    </div>
+                    ` : ''}
+                </div>
+
+                <div style="background:var(--card-bg); border-radius:20px; padding:20px;">
+                    <div style="font-weight:700; margin-bottom:12px;">振り返りログ</div>
+                    <div style="max-height:200px; overflow-y:auto; font-size:13px;">
+                        ${reflectionHistory.length > 0 ? reflectionHistory.map(h => `
+                            <div style="border-bottom:1px solid #eee; padding:10px 0;">
+                                <div style="color:var(--primary); font-weight:bold;">${h.week}</div>
+                                <div style="opacity:0.6;">🎯 ${h.goal || '(なし)'}</div>
+                                <div style="margin-top:4px;">🌟 ${h.ref || '(なし)'}</div>
+                            </div>
+                        `).join('') : '<div style="opacity:0.3; text-align:center;">履歴がありません</div>'}
+                    </div>
+                </div>
+
+                <div style="margin-top:30px; text-align:center; opacity:0.3; font-size:12px;">バージョン 1.1.0</div>
+            `;
+        }
+
+        function setPreAlarm(v) {
+            preAlarmMinutes = parseInt(v);
+            localStorage.setItem('preAlarmMinutes', v);
+        }
+
+        function toggleSparkles(v) {
+            showSparkles = v;
+            localStorage.setItem('showSparkles', v);
+            if (v) document.getElementById('body').classList.add('sparkle-body');
+            else document.getElementById('body').classList.remove('sparkle-body');
+        }
+
+        function setMainColor(c) {
+            primaryColor = c;
+            document.documentElement.style.setProperty('--primary', c);
+            localStorage.setItem('primaryColor', c);
+        }
+
+        function toggleExtraTasks(v) {
+            allowExtraTasks = v;
+            localStorage.setItem('allowExtraTasks', v);
+        }
+
+        function toggleWeeklyFeature(v) {
+            useWeeklyFeature = v;
+            localStorage.setItem('useWeeklyFeature', v);
+            renderSettings(); // 画面を更新！
+        }
+
+        function changeTheme(season) {
+            const labels = {
+                spring: '2026/04/10 (fri)', summer: '2026/08/15 (sat)',
+                autumn: '2026/10/22 (thu)', winter: '2026/12/24 (wed)'
+            };
+            
+            // 季節に合わせて背景の色（クラス）を変える魔法
+            const body = document.getElementById('body');
+            body.classList.remove('theme-summer', 'theme-autumn', 'theme-winter');
+            if (season !== 'spring') {
+                body.classList.add('theme-' + season);
+            }
+
+            const colors = { 
+                spring:'#FF4757', 
+                summer:'#1E90FF', 
+                autumn:'#E67E22', 
+                winter:'#6C5CE7' 
+            };
+            setMainColor(colors[season]);
+            document.getElementById('date-label').innerText = labels[season];
+            
+            // 季節のしるしを呼ぶよ！
+            renderParticles(season);
+        }
+
+        /* --- 季節のしるし（パーティクル）を表示する魔法 --- */
+        function renderParticles(season) {
+            const container = document.getElementById('bg-particles');
+            if (!container) return;
+            
+            // 前のタイマーを止めて、画面をきれいにするよ
+            if (particleInterval) clearInterval(particleInterval);
+            if (sparkleInterval) clearInterval(sparkleInterval);
+            container.innerHTML = '';
+            
+            // 夏限定の特別なキラキラ（15秒に1回）
+            if (season === 'summer') {
+                const createSparkle = () => {
+                    const s = document.createElement('div');
+                    s.className = 'special-sparkle';
+                    s.style.left = (Math.random() * 80 + 10) + '%';
+                    s.style.top = (Math.random() * 80 + 10) + '%';
+                    container.appendChild(s);
+                    setTimeout(() => { if(s.parentNode) s.remove(); }, 2000);
+                };
+                createSparkle(); // 最初に出すよ
+                sparkleInterval = setInterval(createSparkle, 15000);
+            }
+            
+            // パーティクルを1つ作る魔法
+            const createParticle = () => {
+                const p = document.createElement('div');
+                p.className = 'particle';
+                p.style.left = (Math.random() * 100) + '%';
+                
+                // 遠近感を出すための判定
+                const isFar = Math.random() > 0.5;
+                
+                // 季節ごとの「形」と「色」を決めるよ
+                if (season === 'spring') {
+                    // 春：グラデーションのある桜の花びら
+                    p.style.background = isFar ? 'linear-gradient(#FF80AB, #FFB7C5)' : 'linear-gradient(#FF4081, #FF80AB)';
+                    p.style.borderRadius = '80% 0 80% 0';
+                } else if (season === 'summer') {
+                    // 夏：マンガ風のキラキラシャボン玉
+                    p.style.background = 'radial-gradient(circle at 30% 30%, white 0%, rgba(255,255,255,0.1) 30%, rgba(135,206,250,0.5) 100%)';
+                    p.style.border = '1px solid rgba(255,255,255,0.8)';
+                    p.style.borderRadius = '50%';
+                } else if (season === 'autumn') {
+                    // 秋：紅葉した色とりどりの落ち葉
+                    const leafColors = [['#D35400', '#A04000'], ['#C0392B', '#922B21'], ['#F1C40F', '#D4AC0D']];
+                    const set = leafColors[Math.floor(Math.random() * leafColors.length)];
+                    p.style.background = `linear-gradient(45deg, ${set[0]}, ${set[1]})`;
+                    p.style.borderRadius = '50% 0 50% 0';
+                } else {
+                    // 冬：キラキラした雪の結晶
+                    p.style.background = 'white';
+                    p.style.clipPath = 'polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%)';
+                }
+                
+                if (isFar) {
+                    // 遠く：小さく、薄く、ぼやけて、ゆっくり
+                    const size = Math.random() * 5 + 5;
+                    p.style.width = size + 'px';
+                    p.style.height = (size * 1.2) + 'px';
+                    p.style.setProperty('--p-opacity', '0.5'); // 少し濃くしたよ
+                    p.style.filter = 'blur(0.8px)'; // ぼかしを少し弱くしたよ
+                    p.style.animationDuration = (Math.random() * 5 + 18) + 's';
+                } else {
+                    // 近く：大きく、はっきり、速め
+                    const size = Math.random() * 8 + 12;
+                    p.style.width = size + 'px';
+                    p.style.height = (size * 1.3) + 'px';
+                    p.style.setProperty('--p-opacity', '0.9'); // ほぼ不透明にしたよ
+                    p.style.filter = 'none'; // ぼかしをなくしたよ
+                    p.style.animationDuration = (Math.random() * 5 + 10) + 's';
+                }
+                
+                container.appendChild(p);
+                
+                // 落ち終わったら消すよ
+                const durationMs = parseFloat(p.style.animationDuration) * 1000;
+                setTimeout(() => { if(p.parentNode) p.remove(); }, durationMs);
+            };
+
+            // 1枚目をすぐに出すよ
+            createParticle();
+
+            // 6秒ごとに新しく出すよ（1分間で10枚になるよ！）
+            particleInterval = setInterval(createParticle, 6000);
+        }
+
+        /* --- 動物たちを背景に表示する魔法 --- */
+        function renderFriends(season) {
+            const container = document.getElementById('bg-friends');
+            if (!container) return;
+            container.innerHTML = ''; // 前の動物たちには帰ってもらうよ
+            
+            // 季節ごとの動物たちのリスト
+            const animalSets = {
+                spring: ['🦋', '🐰', '🦌', '🦋'],
+                summer: ['🐳', '🐟', '🪸', '🐟'],
+                autumn: ['🐿️', '🦊', '🐦', '🐿️'],
+                winter: ['🐧', '🐻‍❄️', '🐧']
+            };
+            
+            const friends = animalSets[season] || animalSets.spring;
+            friends.forEach((emoji, index) => {
+                const div = document.createElement('div');
+                // 偶数か奇数かで違う動きにするよ
+                div.className = 'friend' + (index % 2 === 0 ? '' : ' friend-alt');
+                div.innerText = emoji;
+                // 最初の位置をバラバラにするよ
+                div.style.left = (Math.random() * 80) + '%';
+                div.style.top = (Math.random() * 80) + '%';
+                div.style.animationDelay = (index * -7) + 's'; // タイミングをずらすよ
+                container.appendChild(div);
+            });
+        }
+
+        /* --- 今の月から自動で季節を決める魔法 --- */
+        function autoSetSeason() {
+            const month = new Date().getMonth() + 1; // 今は何月かな？
+            let season = 'spring';
+            
+            if (month >= 6 && month <= 8) season = 'summer'; // 6,7,8月は夏
+            else if (month >= 9 && month <= 11) season = 'autumn'; // 9,10,11月は秋
+            else if (month >= 12 || month <= 2) season = 'winter'; // 12,1,2月は冬
+            
+            changeTheme(season);
+        }
+
+        /* --- 1秒ごとの全体チェック --- */
+        setInterval(() => {
+            const now = new Date();
+            const timeStr = now.toLocaleTimeString('ja-JP', {hour12:false});
+            const miniClock = document.getElementById('clock-mini');
+            if (miniClock) miniClock.innerText = timeStr;
+
+            const alertTimeDate = new Date(now.getTime() + preAlarmMinutes * 60000);
+            const alertStr = alertTimeDate.getHours().toString().padStart(2,'0') + ":" + alertTimeDate.getMinutes().toString().padStart(2,'0');
+
+            tasks.forEach((task, index) => {
+                if (task.time === alertStr && !task.notified) {
+                    currentAlarmingTaskIndex = index; // どの予定か覚えさせるよ
+                    showAlarm(task.title);
+                    task.notified = true;
+                }
+            });
+        }, 1000);
+
+        function showAlarm(t) {
+            document.getElementById('alarm-msg').innerText = `「${t}」の時間になったよ！`;
+            document.getElementById('alarm-overlay').style.display = 'flex';
+            playAlarmSound(); // 音を鳴らすよ！
+        }
+        function toggleHistory(event) {
+            if (event) {
+                event.stopPropagation();
+            }
+            const container = document.getElementById('history-container');
+            if (!container) return;
+            
+            if (container.style.display === 'none') {
+                isHistoryOpen = true;
+                renderHistoryList();
+                container.style.display = 'block';
+            } else {
+                isHistoryOpen = false;
+                container.style.display = 'none';
+            }
+        }
+
+        function renderHistoryList() {
+            const container = document.getElementById('history-container');
+            if (!container) return;
+            container.innerHTML = `
+                <div style="background: white; border-radius: 20px; padding: 16px; margin-bottom: 20px; border: 1px solid rgba(0,0,0,0.05); box-shadow: 0 4px 10px rgba(0,0,0,0.05); animation: slideUp 0.3s ease-out;">
+                    <div style="font-weight:bold; color:var(--primary); margin-bottom:8px; font-size:14px;">📋 スケジュール履歴</div>
+                    <div style="max-height:150px; overflow-y:auto;">
+                        ${taskHistory.length > 0 ? taskHistory.map((title, index) => `
+                            <div style="display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid #eee; font-size:13px;">
+                                <span style="opacity:0.8; color:var(--text); text-align:left; cursor:pointer;" 
+                                      onmousedown="selectHistoryItem(event, '${title.replace(/'/g, "\\'")}')" 
+                                      ontouchstart="selectHistoryItem(event, '${title.replace(/'/g, "\\'")}')">
+                                    ${title}
+                                </span>
+                                <span style="color:#ff4757; font-weight:bold; cursor:pointer; padding:2px 8px; font-size:12px;" onclick="deleteHistoryItem(event, ${index})">✖</span>
+                            </div>
+                        `).join('') : '<div style="text-align:center; opacity:0.3; padding:10px; font-size:12px;">履歴はありません</div>'}
+                    </div>
+                </div>
+            `;
+        }
+
+        function selectHistoryItem(event, title) {
+            if (event) {
+                event.preventDefault(); // 入力欄からフォーカスが外れてキーボードが閉じるのを防ぐよ
+                event.stopPropagation();
+            }
+            const input = document.getElementById('task-title');
+            if (input) {
+                input.value = title;
+                input.focus(); // すぐに入力できるようにカーソルを合わせるよ！
+            }
+        }
+
+        function deleteHistoryItem(event, index) {
+            event.stopPropagation(); // 親要素のイベント伝播を防ぐよ
+            if (confirm("履歴から消してもいい？")) {
+                taskHistory.splice(index, 1);
+                localStorage.setItem('taskHistory', JSON.stringify(taskHistory));
+                renderHistoryList();
+            }
+        }
+
+        function closeAlarm() { 
+            document.getElementById('alarm-overlay').style.display = 'none'; 
+            stopAlarmSound(); // 音を止めるよ！
+
+            // アラームを止めたら、その予定を自動で消す魔法だよ
+            if (currentAlarmingTaskIndex !== -1) {
+                const item = tasks.splice(currentAlarmingTaskIndex, 1)[0];
+                item.deletedAt = Date.now();
+                deletedTasks.unshift(item); // ゴミ箱に入れる
+                
+                // アラームが鳴り終わったので履歴に追加するよ
+                const idx = taskHistory.indexOf(item.title);
+                if (idx > -1) taskHistory.splice(idx, 1);
+                taskHistory.unshift(item.title);
+                if (taskHistory.length > 50) taskHistory = taskHistory.slice(0, 50);
+                localStorage.setItem('taskHistory', JSON.stringify(taskHistory));
+
+                saveTasks();
+                saveDeletedTasks();
+                renderSchedule(); // 画面を更新！
+                currentAlarmingTaskIndex = -1; // リセット
+            }
+        }
+
+        /* --- 音を鳴らす魔法 --- */
+        function playAlarmSound() {
+            if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            
+            const makeBeep = () => {
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(880, audioCtx.currentTime); // 「ラ」の音だよ
+                
+                gain.gain.setValueAtTime(0, audioCtx.currentTime);
+                gain.gain.linearRampToValueAtTime(0.3, audioCtx.currentTime + 0.05);
+                gain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.3);
+                
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.4);
+            };
+
+            // 1秒ごとにピピッ、ピピッとならすよ
+            if (soundInterval) clearInterval(soundInterval);
+            makeBeep();
+            soundInterval = setInterval(makeBeep, 1000);
+        }
+
+        function stopAlarmSound() {
+            if (soundInterval) {
+                clearInterval(soundInterval);
+                soundInterval = null;
+            }
+        }
+
+        // 最後に、今の季節に合わせてアプリをスタート！
+        autoSetSeason();
+        showTab('schedule');
+
+        // PWAのサービスワーカーを登録して、アプリのようにインストールできるようにするよ！
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('sw.js')
+                    .then(reg => console.log('PWAの準備ができたよ！', reg))
+                    .catch(err => console.log('PWAの準備に失敗しちゃった...', err));
+            });
+        }
+    </script>
+</body>
+</html>
