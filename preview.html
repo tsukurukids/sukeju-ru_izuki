@@ -435,8 +435,8 @@
         <!-- アラームのときに出る画面 -->
         <div id="alarm-overlay">
             <div style="font-size: 64px; margin-bottom: 20px;">🎒</div>
-            <div style="font-size: 28px; font-weight: 700; margin-bottom: 10px;">5分前だよ！</div>
-            <div id="alarm-msg" style="font-size: 18px; margin-bottom: 30px;">次の予定の時間です</div>
+            <div style="font-size: 28px; font-weight: 700; margin-bottom: 10px;">時間だよ！</div>
+            <div id="alarm-msg" style="font-size: 18px; margin-bottom: 30px;">予定の時間になりました</div>
             <button onclick="closeAlarm()" style="padding: 12px 40px; border-radius: 20px; border: none; background: white; color: var(--primary); font-weight: 700; cursor: pointer; font-size: 18px; box-shadow: 0 5px 15px rgba(0,0,0,0.2);">了解！</button>
         </div>
 
@@ -463,11 +463,33 @@
 
     <script>
         /* --- データ管理の魔法（localStorage） --- */
-        let tasks = JSON.parse(localStorage.getItem('tasks')) || [
-            { time: "09:00", title: "朝の散歩", info: "公園の入り口", notified: false }
-        ];
+        let tasks = [];
+        try {
+            tasks = JSON.parse(localStorage.getItem('tasks')) || [
+                { time: "09:00", title: "朝の散歩", info: "公園の入り口", notified: false }
+            ];
+            if (!Array.isArray(tasks)) tasks = [{ time: "09:00", title: "朝の散歩", info: "公園の入り口", notified: false }];
+        } catch (e) {
+            tasks = [{ time: "09:00", title: "朝の散歩", info: "公園の入り口", notified: false }];
+        }
+
+        // 毎日のくりかえし予定をためておく場所だよ
+        let repeatingTasks = [];
+        try {
+            repeatingTasks = JSON.parse(localStorage.getItem('repeatingTasks')) || [];
+            if (!Array.isArray(repeatingTasks)) repeatingTasks = [];
+        } catch (e) {
+            repeatingTasks = [];
+        }
+
         // 消した予定をためておく場所（24時間で消えるよ）
-        let deletedTasks = JSON.parse(localStorage.getItem('deletedTasks')) || [];
+        let deletedTasks = [];
+        try {
+            deletedTasks = JSON.parse(localStorage.getItem('deletedTasks')) || [];
+            if (!Array.isArray(deletedTasks)) deletedTasks = [];
+        } catch (e) {
+            deletedTasks = [];
+        }
         
         // --- サブ設定の魔法 ---
         let preAlarmMinutes = parseInt(localStorage.getItem('preAlarmMinutes')) || 0;
@@ -478,14 +500,57 @@
         let useWeeklyFeature = localStorage.getItem('useWeeklyFeature') !== 'false'; // めあて・振り返り機能だよ
         let weeklyGoal = localStorage.getItem('weeklyGoal') || '';
         let weeklyReflection = localStorage.getItem('weeklyReflection') || '';
-        let reflectionHistory = JSON.parse(localStorage.getItem('reflectionHistory')) || [];
+
+        let reflectionHistory = [];
+        try {
+            reflectionHistory = JSON.parse(localStorage.getItem('reflectionHistory')) || [];
+            if (!Array.isArray(reflectionHistory)) reflectionHistory = [];
+        } catch (e) {
+            reflectionHistory = [];
+        }
+
+        let taskHistory = [];
+        try {
+            const storedHistory = JSON.parse(localStorage.getItem('taskHistory')) || [];
+            if (Array.isArray(storedHistory)) {
+                // 古いオブジェクト形式の履歴があれば文字列（タイトル）に自動変換するよ
+                taskHistory = storedHistory.map(item => {
+                    if (typeof item === 'object' && item !== null && item.title) {
+                        return item.title;
+                    }
+                    return typeof item === 'string' ? item : '';
+                }).filter(title => title !== '');
+            }
+        } catch (e) {
+            taskHistory = [];
+        }
 
         // --- 日付が変わったら予定を全部リセットする魔法 ---
         const todayStr = new Date().toDateString(); // 今日の日付（文字）
         const lastDate = localStorage.getItem('lastDate'); // 前に開いたときの日付
         
         if (lastDate && lastDate !== todayStr) {
-            tasks = []; // 日付が変わっていたら予定を空っぽにするよ
+            const todayDOW = new Date().getDay(); // 0:日, 1:月...6:土
+            
+            // 履歴に前日の予定（リセットされる予定）の文字だけを追加するよ
+            tasks.forEach(t => {
+                if (t.repeatType === 'none' && !t.isRepeating) {
+                    // 同じ予定がすでにあれば一回消してから先頭に追加するよ（重複を防ぐよ）
+                    const idx = taskHistory.indexOf(t.title);
+                    if (idx > -1) taskHistory.splice(idx, 1);
+                    taskHistory.unshift(t.title);
+                }
+            });
+            if (taskHistory.length > 50) taskHistory = taskHistory.slice(0, 50);
+            localStorage.setItem('taskHistory', JSON.stringify(taskHistory));
+
+            // 日付が変わっていたら、くりかえしの予定をセットするよ！
+            tasks = repeatingTasks.filter(rt => {
+                if (rt.repeatType === 'daily') return true; // 毎日はいつでも
+                if (rt.repeatType === 'weekly' && rt.dayOfWeek === todayDOW) return true; // 毎曜日は同じ曜日だけ
+                if (rt.isRepeating === true) return true; // 前のバージョンで作った「毎日」も対応するよ
+                return false;
+            }).map(rt => ({ ...rt, notified: false }));
             saveTasks();
         }
         localStorage.setItem('lastDate', todayStr); // 今日の日付を覚えさせるよ
@@ -536,6 +601,7 @@
         let currentToolTab = 'timer'; // 時計を無くしたのでデフォルトをタイマーにするよ
         let isTrashOpen = false; // ゴミ箱が開いているかどうかの状態
         let isTaskFormOpen = true; // 予定を書く欄が開いているかどうかの状態
+        let isHistoryOpen = false; // 履歴が開いているかどうかの状態
         let currentAlarmingTaskIndex = -1; // 今アラームが鳴っている予定の番号だよ
 
         /* --- 画面を表示する関数 --- */
@@ -601,7 +667,7 @@
                 <div class="task-card" style="animation-delay: ${index * 0.1}s">
                     <div class="task-time">${task.time}</div>
                     <div class="task-info">
-                        <div class="task-title">${task.title}</div>
+                        <div class="task-title">${(task.repeatType === 'daily' || task.isRepeating) ? '🔁 ' : ''}${task.repeatType === 'weekly' ? '📅 ' : ''}${task.title}</div>
                         <div style="font-size:12px;opacity:0.6;">${task.info || '予定だよ'}</div>
                     </div>
                     <div style="color:var(--primary); cursor:pointer;" onclick="deleteTask(${index})">
@@ -630,13 +696,23 @@
                         <select id="task-time-h" class="timer-input" style="flex:1; appearance: none; -webkit-appearance: none; text-align-last: center; font-size:16px; padding:10px;">${hOptions}</select>
                         <span style="font-weight:bold; color:var(--primary);">:</span>
                         <select id="task-time-m" class="timer-input" style="flex:1; appearance: none; -webkit-appearance: none; text-align-last: center; font-size:16px; padding:10px;">${mOptions}</select>
-                        <input type="text" id="task-title" placeholder="なにをする？" style="flex:2;">
+                        <input type="text" id="task-title" placeholder="なにをする？" style="flex:2;" onclick="toggleHistory(event)">
+                        <select id="task-repeat-type" class="timer-input" style="flex:1; font-size:14px; padding:8px; border-radius:12px; background-color:white; border:2px solid var(--primary); cursor:pointer;">
+                            <option value="none">くりかえしなし</option>
+                            <option value="daily">毎日</option>
+                            <option value="weekly">毎曜日</option>
+                        </select>
                         <button class="add-task-btn" onclick="addTask()">追加</button>
                     </div>
                     ` : ''}
                 </div>
+                <div id="history-container" style="display: ${isHistoryOpen ? 'block' : 'none'};"></div>
                 <div class="task-list">${listHTML || '<div style="text-align:center; opacity:0.3; padding:20px;">予定がありません</div>'}</div>
             `;
+
+            if (isHistoryOpen) {
+                renderHistoryList();
+            }
 
             const trashContainer = document.getElementById('trash-container');
             if (deletedTasks.length > 0 && currentTab === 'schedule') {
@@ -661,6 +737,9 @@
         // 予定を書く欄を開いたり閉じたりする魔法（関数）
         function toggleTaskForm() {
             isTaskFormOpen = !isTaskFormOpen; // 開いていたら閉じる、閉じていたら開く
+            if (!isTaskFormOpen) {
+                isHistoryOpen = false; // 閉じたときは履歴も閉じるよ！
+            }
             renderSchedule(); // 画面を描き直す
         }
 
@@ -674,6 +753,7 @@
             const mVal = document.getElementById('task-time-m').value;
             const timeVal = `${hVal}:${mVal}`;
             const titleVal = document.getElementById('task-title').value;
+            const repeatTypeVal = document.getElementById('task-repeat-type').value; // くりかえしの種類
             
             // スケジュールの最大数を決めるよ（スイッチが入っていたら20個、入っていなかったら15個）
             const maxTasks = allowExtraTasks ? 20 : 15;
@@ -685,19 +765,41 @@
             }
 
             if (timeVal && titleVal) {
-                tasks.push({ time: timeVal, title: titleVal, notified: false });
+                const newTask = { 
+                    time: timeVal, 
+                    title: titleVal, 
+                    notified: false, 
+                    repeatType: repeatTypeVal,
+                    dayOfWeek: new Date().getDay() // 今日の曜日を保存しておくよ
+                };
+                tasks.push(newTask);
                 tasks.sort((a, b) => a.time.localeCompare(b.time));
                 saveTasks();
+                
+                // もし「くりかえし」なら、くりかえしリストにも追加するよ
+                if (repeatTypeVal !== 'none') {
+                    repeatingTasks.push(newTask);
+                    saveRepeatingTasks();
+                }
+
                 renderSchedule();
                 
                 // 入力したあと、文字を消してスッキリさせるよ
                 document.getElementById('task-title').value = '';
+                document.getElementById('task-repeat-type').value = 'none'; // メニューもリセットするよ
             }
         }
 
         function deleteTask(index) {
             if(confirm("消してもいい？")) {
                 const item = tasks.splice(index, 1)[0];
+                
+                // もし「くりかえし」の予定だったら、くりかえしリストからも消してあげるよ
+                if (item.repeatType === 'daily' || item.repeatType === 'weekly' || item.isRepeating) {
+                    repeatingTasks = repeatingTasks.filter(rt => rt.time !== item.time || rt.title !== item.title);
+                    saveRepeatingTasks();
+                }
+
                 // 消した時刻をくっつけてゴミ箱にポイ！
                 item.deletedAt = Date.now();
                 deletedTasks.unshift(item); // 上に追加
@@ -714,6 +816,16 @@
             tasks.push(item);
             tasks.sort((a, b) => a.time.localeCompare(b.time));
             saveTasks();
+            
+            // もし「くりかえし」の予定だったら、くりかえしリストにも戻してあげるよ
+            if (item.repeatType === 'daily' || item.repeatType === 'weekly' || item.isRepeating) {
+                const exists = repeatingTasks.some(rt => rt.time === item.time && rt.title === item.title);
+                if (!exists) {
+                    repeatingTasks.push({ ...item, notified: false });
+                    saveRepeatingTasks();
+                }
+            }
+
             saveDeletedTasks();
             isTrashOpen = false; // 復活させたらゴミ箱を閉じる（リセット）
             renderSchedule();
@@ -721,6 +833,7 @@
 
         function saveTasks() { localStorage.setItem('tasks', JSON.stringify(tasks)); }
         function saveDeletedTasks() { localStorage.setItem('deletedTasks', JSON.stringify(deletedTasks)); }
+        function saveRepeatingTasks() { localStorage.setItem('repeatingTasks', JSON.stringify(repeatingTasks)); }
         
         function saveWeeklyGoal(v) { weeklyGoal = v; localStorage.setItem('weeklyGoal', v); }
         function saveWeeklyRef(v) { weeklyReflection = v; localStorage.setItem('weeklyReflection', v); }
@@ -1160,10 +1273,70 @@
         }, 1000);
 
         function showAlarm(t) {
-            document.getElementById('alarm-msg').innerText = `「${t}」の${preAlarmMinutes}分前だよ！`;
+            document.getElementById('alarm-msg').innerText = `「${t}」の時間になったよ！`;
             document.getElementById('alarm-overlay').style.display = 'flex';
             playAlarmSound(); // 音を鳴らすよ！
         }
+        function toggleHistory(event) {
+            if (event) {
+                event.stopPropagation();
+            }
+            const container = document.getElementById('history-container');
+            if (!container) return;
+            
+            if (container.style.display === 'none') {
+                isHistoryOpen = true;
+                renderHistoryList();
+                container.style.display = 'block';
+            } else {
+                isHistoryOpen = false;
+                container.style.display = 'none';
+            }
+        }
+
+        function renderHistoryList() {
+            const container = document.getElementById('history-container');
+            if (!container) return;
+            container.innerHTML = `
+                <div style="background: white; border-radius: 20px; padding: 16px; margin-bottom: 20px; border: 1px solid rgba(0,0,0,0.05); box-shadow: 0 4px 10px rgba(0,0,0,0.05); animation: slideUp 0.3s ease-out;">
+                    <div style="font-weight:bold; color:var(--primary); margin-bottom:8px; font-size:14px;">📋 スケジュール履歴</div>
+                    <div style="max-height:150px; overflow-y:auto;">
+                        ${taskHistory.length > 0 ? taskHistory.map((title, index) => `
+                            <div style="display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid #eee; font-size:13px;">
+                                <span style="opacity:0.8; color:var(--text); text-align:left; cursor:pointer;" 
+                                      onmousedown="selectHistoryItem(event, '${title.replace(/'/g, "\\'")}')" 
+                                      ontouchstart="selectHistoryItem(event, '${title.replace(/'/g, "\\'")}')">
+                                    ${title}
+                                </span>
+                                <span style="color:#ff4757; font-weight:bold; cursor:pointer; padding:2px 8px; font-size:12px;" onclick="deleteHistoryItem(event, ${index})">✖</span>
+                            </div>
+                        `).join('') : '<div style="text-align:center; opacity:0.3; padding:10px; font-size:12px;">履歴はありません</div>'}
+                    </div>
+                </div>
+            `;
+        }
+
+        function selectHistoryItem(event, title) {
+            if (event) {
+                event.preventDefault(); // 入力欄からフォーカスが外れてキーボードが閉じるのを防ぐよ
+                event.stopPropagation();
+            }
+            const input = document.getElementById('task-title');
+            if (input) {
+                input.value = title;
+                input.focus(); // すぐに入力できるようにカーソルを合わせるよ！
+            }
+        }
+
+        function deleteHistoryItem(event, index) {
+            event.stopPropagation(); // 親要素のイベント伝播を防ぐよ
+            if (confirm("履歴から消してもいい？")) {
+                taskHistory.splice(index, 1);
+                localStorage.setItem('taskHistory', JSON.stringify(taskHistory));
+                renderHistoryList();
+            }
+        }
+
         function closeAlarm() { 
             document.getElementById('alarm-overlay').style.display = 'none'; 
             stopAlarmSound(); // 音を止めるよ！
@@ -1173,6 +1346,14 @@
                 const item = tasks.splice(currentAlarmingTaskIndex, 1)[0];
                 item.deletedAt = Date.now();
                 deletedTasks.unshift(item); // ゴミ箱に入れる
+                
+                // アラームが鳴り終わったので履歴に追加するよ
+                const idx = taskHistory.indexOf(item.title);
+                if (idx > -1) taskHistory.splice(idx, 1);
+                taskHistory.unshift(item.title);
+                if (taskHistory.length > 50) taskHistory = taskHistory.slice(0, 50);
+                localStorage.setItem('taskHistory', JSON.stringify(taskHistory));
+
                 saveTasks();
                 saveDeletedTasks();
                 renderSchedule(); // 画面を更新！
