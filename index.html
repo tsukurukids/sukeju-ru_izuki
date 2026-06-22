@@ -401,6 +401,35 @@
             90% { opacity: var(--p-opacity, 0.6); }
             100% { transform: translate(0, 800px) rotate(360deg); opacity: 0; }
         }
+
+        /* 予定を書くフォームが開いているときだけの全画面モードの設定だよ */
+        .form-active-mode header,
+        .form-active-mode #trash-container,
+        .form-active-mode .task-list,
+        .form-active-mode nav,
+        .form-active-mode div[style*="dashed var(--primary)"] {
+            display: none !important; /* ヘッダー、ゴミ箱、予定リスト、ナビ、目標を隠すよ */
+        }
+        .form-active-mode .tab-content {
+            padding: 20px;
+            overflow-y: auto;
+        }
+
+        /* 今週の目標を編集しているときだけの全画面モードの設定だよ */
+        .goal-edit-active-mode header,
+        .goal-edit-active-mode #trash-container,
+        .goal-edit-active-mode .task-list,
+        .goal-edit-active-mode nav,
+        .goal-edit-active-mode .add-task-form {
+            display: none !important; /* ヘッダー、ゴミ箱、予定リスト、ナビ、予定の入力欄を隠すよ */
+        }
+        .goal-edit-active-mode .tab-content {
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center; /* まんなかに寄せるよ */
+            height: 100%;
+        }
     </style>
 </head>
 <body id="body" class="sparkle-body">
@@ -600,8 +629,10 @@
         let currentTab = 'schedule';
         let currentToolTab = 'timer'; // 時計を無くしたのでデフォルトをタイマーにするよ
         let isTrashOpen = false; // ゴミ箱が開いているかどうかの状態
-        let isTaskFormOpen = true; // 予定を書く欄が開いているかどうかの状態
+        let isTaskFormOpen = false; // 予定を書く欄が開いているかどうかの状態
         let isHistoryOpen = false; // 履歴が開いているかどうかの状態
+        let isGoalEditing = false; // 今週の目標を編集しているかどうかの状態
+        let isGoalMenuOpen = false; // 目標のメニュー（⋮）が開いているかどうかの状態
         let currentAlarmingTaskIndex = -1; // 今アラームが鳴っている予定の番号だよ
 
         /* --- 画面を表示する関数 --- */
@@ -620,6 +651,8 @@
                 else if (tab === 'settings') renderSettings();
             }
             updateTimerMode(); // タブが切り替わったら全画面にするかチェックするよ
+            updateFormMode(); // 予定を書く画面の全画面チェックもするよ
+            updateGoalEditMode(); // 目標を書く画面の全画面チェックもするよ
         }
 
         /* --- 1. スケジュール画面 --- */
@@ -642,12 +675,39 @@
             // --- 週の目標表示 ---
             let weeklyHTML = '';
             if (useWeeklyFeature) {
-                weeklyHTML += `
-                    <div style="background:rgba(255,255,255,0.6); backdrop-filter:blur(5px); border-radius:15px; padding:10px 14px; margin-bottom:15px; border:1px dashed var(--primary); animation: slideUp 0.5s ease-out;">
-                        <div style="font-weight:bold; color:var(--primary); font-size:12px; margin-bottom:4px;">🎯 今週の目標</div>
-                        <textarea id="weekly-goal-input" oninput="saveWeeklyGoal(this.value)" placeholder="今週の目標は？" style="width:100%; border:none; background:transparent; font-size:14px; outline:none; resize:none; min-height:44px; padding:4px 0; line-height:1.4; display:block;">${weeklyGoal}</textarea>
-                    </div>
-                `;
+                if (isGoalEditing) {
+                    weeklyHTML += `
+                        <div style="background:white; border-radius:24px; padding:24px; border:1px solid rgba(0,0,0,0.05); box-shadow:0 4px 10px rgba(0,0,0,0.05); display: flex; flex-direction: column; gap: 16px; width: 100%; animation: slideUp 0.5s ease-out;">
+                            <div style="font-weight:bold; color:var(--primary); font-size:16px;">🎯 今週の目標を書こう</div>
+                            <textarea id="weekly-goal-input" placeholder="今週の目標は？" style="width:100%; border:1px solid #ddd; border-radius:12px; font-size:18px; font-weight:600; outline:none; resize:none; min-height:80px; padding:12px; line-height:1.4; display:block;">${weeklyGoal}</textarea>
+                            <div style="display:flex; gap:10px; justify-content:flex-end;">
+                                <button onclick="cancelWeeklyGoalBtn(event)" style="padding:8px 16px; border-radius:12px; border:2px solid var(--primary); background:white; color:var(--primary); font-weight:bold; font-size:14px; cursor:pointer;">キャンセル</button>
+                                <button onclick="saveWeeklyGoalBtn(event)" style="padding:8px 16px; border-radius:12px; border:none; background:var(--primary); color:white; font-weight:bold; font-size:14px; cursor:pointer;">保存する</button>
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    weeklyHTML += `
+                        <div style="background:rgba(255,255,255,0.6); backdrop-filter:blur(5px); border-radius:15px; padding:10px 14px; margin-bottom:15px; border:1px dashed var(--primary); animation: slideUp 0.5s ease-out; display: flex; flex-direction: column; gap: 4px; position: relative;">
+                            <div style="font-weight:bold; color:var(--primary); font-size:12px; display:flex; align-items:center; width:100%;">
+                                <span>🎯 今週の目標</span>
+                                <div style="position: relative; margin-left: auto;">
+                                    <span onclick="toggleGoalMenu(event)" style="font-size: 18px; font-weight: bold; cursor: pointer; padding: 0 8px; color: var(--primary); display: inline-block; line-height: 1;">⋮</span>
+                                    ${isGoalMenuOpen ? `
+                                        <div style="position: absolute; right: 0; top: 20px; background: white; border: 1px solid #eee; box-shadow: 0 4px 10px rgba(0,0,0,0.1); border-radius: 8px; z-index: 100; min-width: 80px;">
+                                            <div onclick="editWeeklyGoalBtn(event)" style="padding: 8px 12px; font-size: 12px; font-weight: bold; color: var(--primary); cursor: pointer; text-align: center;">編集する</div>
+                                        </div>
+                                    ` : ''}
+                                </div>
+                            </div>
+                            ${weeklyGoal ? `
+                                <div style="font-size:18px; font-weight:600; line-height:1.4; color:var(--text); white-space: pre-wrap; word-break: break-all; padding:2px 0;">${weeklyGoal}</div>
+                            ` : `
+                                <div onclick="editWeeklyGoalBtn(event)" style="font-size:18px; font-weight:600; line-height:1.4; color:var(--text); white-space: pre-wrap; word-break: break-all; padding:2px 0; cursor: pointer; opacity: 0.6;">目標を書こう！</div>
+                            `}
+                        </div>
+                    `;
+                }
             }
             
             // 1. 日付が変わっていたら古いものはバイバイ！
@@ -741,6 +801,8 @@
                 isHistoryOpen = false; // 閉じたときは履歴も閉じるよ！
             }
             renderSchedule(); // 画面を描き直す
+            updateFormMode(); // 全画面モードを切り替えるよ
+            updateGoalEditMode(); // 目標編集の全画面チェックもするよ
         }
 
         function toggleRefInput() {
@@ -787,6 +849,12 @@
                 // 入力したあと、文字を消してスッキリさせるよ
                 document.getElementById('task-title').value = '';
                 document.getElementById('task-repeat-type').value = 'none'; // メニューもリセットするよ
+
+                // 予定を追加したあとは、自動でフォームを閉じるようにするよ！
+                isTaskFormOpen = false;
+                isHistoryOpen = false;
+                renderSchedule();
+                updateFormMode();
             }
         }
 
@@ -969,6 +1037,57 @@
             }
         }
 
+        function updateFormMode() {
+            const frame = document.getElementById('phone-frame');
+            /* 予定を書く欄が開いていて、かつ「スケジュール」タブを開いているときだけ全画面モードにするよ */
+            if (isTaskFormOpen && currentTab === 'schedule') {
+                frame.classList.add('form-active-mode');
+            } else {
+                frame.classList.remove('form-active-mode');
+            }
+        }
+
+        function toggleGoalMenu(event) {
+            if (event) event.stopPropagation();
+            isGoalMenuOpen = !isGoalMenuOpen;
+            renderSchedule();
+        }
+
+        function editWeeklyGoalBtn(event) {
+            if (event) event.stopPropagation();
+            isGoalEditing = true;
+            isGoalMenuOpen = false;
+            renderSchedule();
+            updateGoalEditMode();
+        }
+
+        function saveWeeklyGoalBtn(event) {
+            if (event) event.stopPropagation();
+            const val = document.getElementById('weekly-goal-input').value;
+            weeklyGoal = val;
+            localStorage.setItem('weeklyGoal', val);
+            isGoalEditing = false;
+            renderSchedule();
+            updateGoalEditMode();
+        }
+
+        function cancelWeeklyGoalBtn(event) {
+            if (event) event.stopPropagation();
+            isGoalEditing = false;
+            renderSchedule();
+            updateGoalEditMode();
+        }
+
+        function updateGoalEditMode() {
+            const frame = document.getElementById('phone-frame');
+            /* 今週の目標が編集状態になっていて、かつ「スケジュール」タブを開いているときだけ全画面モードにするよ */
+            if (isGoalEditing && currentTab === 'schedule') {
+                frame.classList.add('goal-edit-active-mode');
+            } else {
+                frame.classList.remove('goal-edit-active-mode');
+            }
+        }
+
 
 
         function showTimerAlarm() {
@@ -1055,15 +1174,15 @@
                 </div>
 
                 <div style="background:var(--card-bg); border-radius:20px; padding:20px;">
-                    <div style="font-weight:700; margin-bottom:12px;">振り返りログ</div>
+                    <div style="font-weight:700; margin-bottom:12px;">これまでの足跡</div>
                     <div style="max-height:200px; overflow-y:auto; font-size:13px;">
                         ${reflectionHistory.length > 0 ? reflectionHistory.map(h => `
                             <div style="border-bottom:1px solid #eee; padding:10px 0;">
-                                <div style="color:var(--primary); font-weight:bold;">${h.week}</div>
-                                <div style="opacity:0.6;">🎯 ${h.goal || '(なし)'}</div>
-                                <div style="margin-top:4px;">🌟 ${h.ref || '(なし)'}</div>
+                                <div style="color:var(--primary); font-weight:bold;">${h.week} の目標</div>
+                                <div style="opacity:0.8; font-weight:bold; margin-top:2px;">🎯 ${h.goal || '(なし)'}</div>
+                                ${h.ref ? `<div style="margin-top:4px; opacity:0.6;">🌟 振り返り: ${h.ref}</div>` : ''}
                             </div>
-                        `).join('') : '<div style="opacity:0.3; text-align:center;">履歴がありません</div>'}
+                        `).join('') : '<div style="opacity:0.3; text-align:center;">足跡がありません</div>'}
                     </div>
                 </div>
 
@@ -1273,7 +1392,7 @@
         }, 1000);
 
         function showAlarm(t) {
-            document.getElementById('alarm-msg').innerText = `「${t}」の時間になったよ！`;
+            document.getElementById('alarm-msg').innerText = `「${t}」の時間だよ！`;
             document.getElementById('alarm-overlay').style.display = 'flex';
             playAlarmSound(); // 音を鳴らすよ！
         }
@@ -1394,6 +1513,14 @@
                 soundInterval = null;
             }
         }
+
+        // 画面のどこかをクリックしたら、目標メニューを閉じる魔法だよ
+        window.addEventListener('click', () => {
+            if (isGoalMenuOpen) {
+                isGoalMenuOpen = false;
+                renderSchedule();
+            }
+        });
 
         // 最後に、今の季節に合わせてアプリをスタート！
         autoSetSeason();
