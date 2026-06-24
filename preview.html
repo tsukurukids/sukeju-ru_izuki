@@ -366,9 +366,8 @@
 
         /* タイマーが動いているときだけの全画面モードの設定だよ */
         .timer-active-mode header,
-        .timer-active-mode .tool-tab-switch,
         .timer-active-mode .timer-input-group {
-            display: none !important; /* ヘッダー、タブ切り替え、時間を選ぶ欄を隠すよ（メニューは隠さないよ） */
+            display: none !important; /* ヘッダー、時間を選ぶ欄を隠すよ */
         }
         .timer-active-mode .tab-content {
             padding: 20px;
@@ -574,9 +573,18 @@
             localStorage.setItem('taskHistory', JSON.stringify(taskHistory));
 
             // 日付が変わっていたら、くりかえしの予定をセットするよ！
+            const today = new Date();
+            const todayMonth = today.getMonth() + 1;
+            const todayDay = today.getDate();
             tasks = repeatingTasks.filter(rt => {
                 if (rt.repeatType === 'daily') return true; // 毎日はいつでも
-                if (rt.repeatType === 'weekly' && rt.dayOfWeek === todayDOW) return true; // 毎曜日は同じ曜日だけ
+                if (rt.repeatType === 'weekly') {
+                    if (rt.weeklyDays) {
+                        return rt.weeklyDays[todayDOW] === true;
+                    }
+                    return rt.dayOfWeek === todayDOW;
+                } // 選んだ曜日だけくりかえすよ
+                if (rt.repeatType === 'custom' && rt.customMonth === todayMonth && rt.customDay === todayDay) return true; // カスタム設定で選んだ月日だけ
                 if (rt.isRepeating === true) return true; // 前のバージョンで作った「毎日」も対応するよ
                 return false;
             }).map(rt => ({ ...rt, notified: false }));
@@ -634,6 +642,14 @@
         let isGoalEditing = false; // 今週の目標を編集しているかどうかの状態
         let isGoalMenuOpen = false; // 目標のメニュー（⋮）が開いているかどうかの状態
         let currentAlarmingTaskIndex = -1; // 今アラームが鳴っている予定の番号だよ
+        let alarmTimeout = null; // スケジュールのアラームを自動で止めるタイマーだよ
+        let activeTaskMenuIndex = -1; // 今開いている予定メニュー（⋮）の番号だよ
+        let editingTaskIndex = -1; // 今編集している予定の番号だよ
+        let currentAddRepeatType = 'none'; // 新しい予定をつくるときのくりかえし設定だよ
+        let isAddFormRepeatMenuOpen = false; // 新しい予定のくりかえしメニュー（⋮）が開いているかどうかの状態だよ
+        let currentAddCustomMonth = 1; // カスタム設定で選んだ月だよ
+        let currentAddCustomDay = 1; // カスタム設定で選んだ日だよ
+        let currentAddWeeklyDays = [false, false, false, false, false, false, false]; // 毎曜日で選んだ曜日たちだよ (日~土)
 
         /* --- 画面を表示する関数 --- */
         function showTab(tab) {
@@ -661,7 +677,6 @@
             const now = new Date();
             const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
             const currentDay = now.getDay(); // 0:日, 1:月, ...
-
             // スクロールで時間を選べるように選択肢を自動で作るよ
             const hOptions = Array.from({length: 24}, (_, i) => {
                 const val = String(i).padStart(2, '0');
@@ -672,6 +687,19 @@
                 return `<option value="${val}">${val}</option>`;
             }).join('');
 
+            // 編集のときに使う時間えらびの選択肢をつくる魔法だよ
+            const getHOptions = (selectedVal) => {
+                return Array.from({length: 24}, (_, i) => {
+                    const val = String(i).padStart(2, '0');
+                    return `<option value="${val}" ${val === selectedVal ? 'selected' : ''}>${val}</option>`;
+                }).join('');
+            };
+            const getMOptions = (selectedVal) => {
+                return Array.from({length: 60}, (_, i) => {
+                    const val = String(i).padStart(2, '0');
+                    return `<option value="${val}" ${val === selectedVal ? 'selected' : ''}>${val}</option>`;
+                }).join('');
+            };
             // --- 週の目標表示 ---
             let weeklyHTML = '';
             if (useWeeklyFeature) {
@@ -723,18 +751,51 @@
             
             saveDeletedTasks();
 
-            const listHTML = tasks.map((task, index) => `
-                <div class="task-card" style="animation-delay: ${index * 0.1}s">
-                    <div class="task-time">${task.time}</div>
-                    <div class="task-info">
-                        <div class="task-title">${(task.repeatType === 'daily' || task.isRepeating) ? '🔁 ' : ''}${task.repeatType === 'weekly' ? '📅 ' : ''}${task.title}</div>
-                        <div style="font-size:12px;opacity:0.6;">${task.info || '予定だよ'}</div>
+            const listHTML = tasks.map((task, index) => {
+                if (editingTaskIndex === index) {
+                    const taskH = task.time.split(':')[0];
+                    const taskM = task.time.split(':')[1];
+                    return `
+                        <div class="task-card" style="flex-direction: column; align-items: stretch; gap: 10px; animation-delay: ${index * 0.1}s;">
+                            <div style="font-weight: bold; color: var(--primary); font-size: 14px;">✏️ 予定をへんしゅうする</div>
+                            <div style="display: flex; gap: 8px; align-items: center;">
+                                <select id="edit-task-time-h-${index}" class="timer-input" style="flex: 1; appearance: none; -webkit-appearance: none; text-align-last: center; font-size: 16px; padding: 10px;">${getHOptions(taskH)}</select>
+                                <span style="font-weight: bold; color: var(--primary);">:</span>
+                                <select id="edit-task-time-m-${index}" class="timer-input" style="flex: 1; appearance: none; -webkit-appearance: none; text-align-last: center; font-size: 16px; padding: 10px;">${getMOptions(taskM)}</select>
+                            </div>
+                            <input type="text" id="edit-task-title-${index}" value="${task.title}" placeholder="なにをする？" style="font-size: 16px; padding: 10px; border-radius: 12px; border: 2px solid var(--primary); outline: none; background: white; color: var(--text);">
+                            <select id="edit-task-repeat-${index}" class="timer-input" style="font-size: 14px; padding: 8px; border-radius: 12px; background-color: white; border: 2px solid var(--primary); cursor: pointer;">
+                                <option value="none" ${task.repeatType === 'none' ? 'selected' : ''}>くりかえしなし</option>
+                                <option value="daily" ${(task.repeatType === 'daily' || task.isRepeating) ? 'selected' : ''}>毎日</option>
+                                <option value="weekly" ${task.repeatType === 'weekly' ? 'selected' : ''}>毎曜日</option>
+                            </select>
+                            <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 5px;">
+                                <button onclick="cancelEditTask(event)" style="padding: 8px 16px; border-radius: 12px; border: 2px solid var(--primary); background: white; color: var(--primary); font-weight: bold; font-size: 13px; cursor: pointer;">キャンセル</button>
+                                <button onclick="saveEditTask(event, ${index})" style="padding: 8px 16px; border-radius: 12px; border: none; background: var(--primary); color: white; font-weight: bold; font-size: 13px; cursor: pointer;">ほぞんする</button>
+                            </div>
+                        </div>
+                    `;
+                }
+                
+                return `
+                    <div class="task-card" style="animation-delay: ${index * 0.1}s">
+                        <div class="task-time">${task.time}</div>
+                        <div class="task-info">
+                            <div class="task-title">${(task.repeatType === 'daily' || task.isRepeating) ? '🔁 ' : ''}${task.repeatType === 'weekly' ? '📅 ' : ''}${task.title}</div>
+                            <div style="font-size:12px;opacity:0.6;">${task.info || '予定だよ'}</div>
+                        </div>
+                        <div style="position: relative; display: flex; align-items: center;">
+                            <span onclick="toggleTaskMenu(event, ${index})" style="font-size: 20px; font-weight: bold; cursor: pointer; padding: 0 8px; color: var(--primary); display: inline-block; line-height: 1;">⋮</span>
+                            ${activeTaskMenuIndex === index ? `
+                                <div style="position: absolute; right: 0; top: 24px; background: white; border: 1px solid #eee; box-shadow: 0 4px 10px rgba(0,0,0,0.1); border-radius: 8px; z-index: 100; min-width: 80px;">
+                                    <div onclick="startEditTask(event, ${index})" style="padding: 8px 12px; font-size: 12px; font-weight: bold; color: var(--primary); cursor: pointer; text-align: center; border-bottom: 1px solid #eee;">編集する</div>
+                                    <div onclick="deleteTaskDirect(event, ${index})" style="padding: 8px 12px; font-size: 12px; font-weight: bold; color: #ff4757; cursor: pointer; text-align: center;">削除する</div>
+                                </div>
+                            ` : ''}
+                        </div>
                     </div>
-                    <div style="color:var(--primary); cursor:pointer;" onclick="deleteTask(${index})">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
-                    </div>
-                </div>
-            `).join('');
+                `;
+            }).join('');
 
             // ゴミ箱（ふっかつリスト）の表示
             const trashHTML = deletedTasks.map((task, index) => `
@@ -757,12 +818,57 @@
                         <span style="font-weight:bold; color:var(--primary);">:</span>
                         <select id="task-time-m" class="timer-input" style="flex:1; appearance: none; -webkit-appearance: none; text-align-last: center; font-size:16px; padding:10px;">${mOptions}</select>
                         <input type="text" id="task-title" placeholder="なにをする？" style="flex:2;" onclick="toggleHistory(event)">
-                        <select id="task-repeat-type" class="timer-input" style="flex:1; font-size:14px; padding:8px; border-radius:12px; background-color:white; border:2px solid var(--primary); cursor:pointer;">
-                            <option value="none">くりかえしなし</option>
-                            <option value="daily">毎日</option>
-                            <option value="weekly">毎曜日</option>
-                        </select>
+                        
+                        <div style="position: relative; display: flex; align-items: center;">
+                            <span onclick="toggleAddFormRepeatMenu(event)" style="font-size: 20px; font-weight: bold; cursor: pointer; padding: 0 8px; color: var(--primary); display: inline-flex; align-items: center; line-height: 1; position: relative; user-select: none;">
+                                ⋮
+                                ${currentAddRepeatType !== 'none' ? `<span style="position: absolute; top: -2px; right: 0px; width: 8px; height: 8px; background-color: #2ed573; border-radius: 50%;"></span>` : ''}
+                            </span>
+                            ${isAddFormRepeatMenuOpen ? `
+                                <div style="position: absolute; right: 0; top: 32px; background: white; border: 1px solid #eee; box-shadow: 0 4px 10px rgba(0,0,0,0.1); border-radius: 12px; z-index: 100; padding: 6px; display: flex; flex-direction: column; gap: 4px; min-width: 120px;">
+                                    <div onclick="setAddRepeatType(event, 'none')" style="padding: 8px; font-size: 12px; font-weight: bold; color: ${currentAddRepeatType === 'none' ? 'white' : 'var(--primary)'}; background: ${currentAddRepeatType === 'none' ? 'var(--primary)' : 'transparent'}; border-radius: 8px; cursor: pointer; text-align: center;">くりかえしなし</div>
+                                    <div onclick="setAddRepeatType(event, 'daily')" style="padding: 8px; font-size: 12px; font-weight: bold; color: ${currentAddRepeatType === 'daily' ? 'white' : 'var(--primary)'}; background: ${currentAddRepeatType === 'daily' ? 'var(--primary)' : 'transparent'}; border-radius: 8px; cursor: pointer; text-align: center;">毎日</div>
+                                    <div onclick="setAddRepeatType(event, 'weekly')" style="padding: 8px; font-size: 12px; font-weight: bold; color: ${currentAddRepeatType === 'weekly' ? 'white' : 'var(--primary)'}; background: ${currentAddRepeatType === 'weekly' ? 'var(--primary)' : 'transparent'}; border-radius: 8px; cursor: pointer; text-align: center;">毎曜日</div>
+                                    <div onclick="setAddRepeatType(event, 'custom')" style="padding: 8px; font-size: 12px; font-weight: bold; color: ${currentAddRepeatType === 'custom' ? 'white' : 'var(--primary)'}; background: ${currentAddRepeatType === 'custom' ? 'var(--primary)' : 'transparent'}; border-radius: 8px; cursor: pointer; text-align: center;">カスタム</div>
+                                </div>
+                            ` : ''}
+                        </div>
+                        
                         <button class="add-task-btn" onclick="addTask()">追加</button>
+
+                        ${currentAddRepeatType === 'weekly' ? `
+                        <div style="width: 100%; display: flex; flex-direction: column; gap: 6px; margin-top: 8px; animation: fadeIn 0.3s ease-out; background: rgba(0,0,0,0.02); padding: 8px; border-radius: 12px;">
+                            <span style="font-size: 12px; font-weight: bold; color: var(--primary);">繰り返す曜日：</span>
+                            <div style="display: flex; justify-content: space-between; gap: 4px;">
+                                ${['日', '月', '火', '水', '木', '金', '土'].map((day, idx) => {
+                                    const isSelected = currentAddWeeklyDays[idx];
+                                    return `
+                                        <button type="button" onclick="toggleAddWeeklyDay(event, ${idx})" style="flex: 1; padding: 6px 0; font-size: 12px; font-weight: bold; border-radius: 8px; border: 2px solid var(--primary); cursor: pointer; transition: all 0.2s;
+                                            background: ${isSelected ? 'var(--primary)' : 'white'};
+                                            color: ${isSelected ? 'white' : 'var(--primary)'};">
+                                            ${day}
+                                        </button>
+                                    `;
+                                }).join('')}
+                            </div>
+                        </div>
+                        ` : ''}
+
+                        ${currentAddRepeatType === 'custom' ? `
+                        <div style="width: 100%; display: flex; justify-content: space-between; align-items: center; margin-top: 8px; animation: fadeIn 0.3s ease-out; background: rgba(0,0,0,0.02); padding: 8px; border-radius: 12px; gap: 8px;">
+                            <span style="font-size: 12px; font-weight: bold; color: var(--primary); white-space: nowrap;">指定する月日：</span>
+                            <div style="display: flex; gap: 4px; align-items: center; flex: 1; justify-content: flex-end;">
+                                <select id="task-custom-month" class="timer-input" style="font-size: 14px; padding: 6px; border-radius: 8px; border: 2px solid var(--primary); text-align-last: center; width: 60px;" onchange="currentAddCustomMonth = parseInt(this.value)">
+                                    ${Array.from({length: 12}, (_, i) => `<option value="${i+1}" ${(i+1) === currentAddCustomMonth ? 'selected' : ''}>${i+1}</option>`).join('')}
+                                </select>
+                                <span style="font-size: 12px; font-weight: bold; color: var(--primary);">月</span>
+                                <select id="task-custom-day" class="timer-input" style="font-size: 14px; padding: 6px; border-radius: 8px; border: 2px solid var(--primary); text-align-last: center; width: 60px;" onchange="currentAddCustomDay = parseInt(this.value)">
+                                    ${Array.from({length: 31}, (_, i) => `<option value="${i+1}" ${(i+1) === currentAddCustomDay ? 'selected' : ''}>${i+1}</option>`).join('')}
+                                </select>
+                                <span style="font-size: 12px; font-weight: bold; color: var(--primary);">日</span>
+                            </div>
+                        </div>
+                        ` : ''}
                     </div>
                     ` : ''}
                 </div>
@@ -815,7 +921,7 @@
             const mVal = document.getElementById('task-time-m').value;
             const timeVal = `${hVal}:${mVal}`;
             const titleVal = document.getElementById('task-title').value;
-            const repeatTypeVal = document.getElementById('task-repeat-type').value; // くりかえしの種類
+            const repeatTypeVal = currentAddRepeatType; // くりかえしの種類
             
             // スケジュールの最大数を決めるよ（スイッチが入っていたら20個、入っていなかったら15個）
             const maxTasks = allowExtraTasks ? 20 : 15;
@@ -832,13 +938,35 @@
                     title: titleVal, 
                     notified: false, 
                     repeatType: repeatTypeVal,
-                    dayOfWeek: new Date().getDay() // 今日の曜日を保存しておくよ
+                    dayOfWeek: new Date().getDay(), // 今日の曜日を保存しておくよ
+                    weeklyDays: [...currentAddWeeklyDays], // えらんだ曜日たちだよ
+                    customMonth: currentAddCustomMonth, // えらんだ月だよ
+                    customDay: currentAddCustomDay // えらんだ日だよ
                 };
-                tasks.push(newTask);
-                tasks.sort((a, b) => a.time.localeCompare(b.time));
-                saveTasks();
+
+                // もしカスタム日付や曜日なら、今日の条件と一致するときだけ今日のリストに追加するよ
+                let shouldAddToToday = true;
+                if (repeatTypeVal === 'custom') {
+                    const today = new Date();
+                    const todayMonth = today.getMonth() + 1;
+                    const todayDay = today.getDate();
+                    if (currentAddCustomMonth !== todayMonth || currentAddCustomDay !== todayDay) {
+                        shouldAddToToday = false;
+                    }
+                } else if (repeatTypeVal === 'weekly') {
+                    const todayDOW = new Date().getDay();
+                    if (!currentAddWeeklyDays[todayDOW]) {
+                        shouldAddToToday = false;
+                    }
+                }
+
+                if (shouldAddToToday) {
+                    tasks.push(newTask);
+                    tasks.sort((a, b) => a.time.localeCompare(b.time));
+                    saveTasks();
+                }
                 
-                // もし「くりかえし」なら、くりかえしリストにも追加するよ
+                // もし「くりかえし」や「カスタム」なら、くりかえしリストにも追加するよ
                 if (repeatTypeVal !== 'none') {
                     repeatingTasks.push(newTask);
                     saveRepeatingTasks();
@@ -848,7 +976,10 @@
                 
                 // 入力したあと、文字を消してスッキリさせるよ
                 document.getElementById('task-title').value = '';
-                document.getElementById('task-repeat-type').value = 'none'; // メニューもリセットするよ
+                currentAddRepeatType = 'none'; // メニューもリセットするよ
+                currentAddCustomMonth = 1; // カスタム月をリセットするよ
+                currentAddCustomDay = 1; // カスタム日をリセットするよ
+                currentAddWeeklyDays = [false, false, false, false, false, false, false]; // 曜日もリセットするよ
 
                 // 予定を追加したあとは、自動でフォームを閉じるようにするよ！
                 isTaskFormOpen = false;
@@ -972,7 +1103,7 @@
             `;
         }
 
-        function switchTool(t) { currentToolTab = t; renderTools(); }
+        function switchTool(t) { currentToolTab = t; updateTimerMode(); renderTools(); }
 
         /* 時間の表示を計算する魔法 */
         function formatTime(s) {
@@ -1029,8 +1160,8 @@
 
         function updateTimerMode() {
             const frame = document.getElementById('phone-frame');
-            /* タイマーが始まっていて（timerSeconds > 0）、かつ「ツール」タブを開いているときだけ全画面モードにするよ（一時停止でも全画面のまま！） */
-            if (timerSeconds > 0 && currentTab === 'tools') {
+            /* タイマーが始まっていて（timerSeconds > 0）、かつ「ツール」タブを開いていて、かつ「タイマー」の画面を表示しているときだけ全画面モードにするよ（一時停止でも全画面のまま！） */
+            if (timerSeconds > 0 && currentTab === 'tools' && currentToolTab === 'timer') {
                 frame.classList.add('timer-active-mode');
             } else {
                 frame.classList.remove('timer-active-mode');
@@ -1395,6 +1526,12 @@
             document.getElementById('alarm-msg').innerText = `「${t}」の時間だよ！`;
             document.getElementById('alarm-overlay').style.display = 'flex';
             playAlarmSound(); // 音を鳴らすよ！
+            
+            // 13秒間何も押されなかったら、自動で閉じてリセットするよ
+            if (alarmTimeout) clearTimeout(alarmTimeout);
+            alarmTimeout = setTimeout(() => {
+                closeAlarm();
+            }, 13000);
         }
         function toggleHistory(event) {
             if (event) {
@@ -1457,6 +1594,10 @@
         }
 
         function closeAlarm() { 
+            if (alarmTimeout) {
+                clearTimeout(alarmTimeout);
+                alarmTimeout = null;
+            }
             document.getElementById('alarm-overlay').style.display = 'none'; 
             stopAlarmSound(); // 音を止めるよ！
 
@@ -1514,10 +1655,122 @@
             }
         }
 
-        // 画面のどこかをクリックしたら、目標メニューを閉じる魔法だよ
+        // --- 予定のメニュー（⋮）と編集の魔法 ---
+        function toggleTaskMenu(event, index) {
+            event.stopPropagation();
+            if (activeTaskMenuIndex === index) {
+                activeTaskMenuIndex = -1;
+            } else {
+                activeTaskMenuIndex = index;
+                isGoalMenuOpen = false; // 目標メニューは閉じるよ
+            }
+            renderSchedule();
+        }
+
+        function startEditTask(event, index) {
+            event.stopPropagation();
+            editingTaskIndex = index;
+            activeTaskMenuIndex = -1; // メニューは閉じるよ
+            renderSchedule();
+        }
+
+        function cancelEditTask(event) {
+            if (event) event.stopPropagation();
+            editingTaskIndex = -1;
+            renderSchedule();
+        }
+
+        function saveEditTask(event, index) {
+            if (event) event.stopPropagation();
+            const hVal = document.getElementById(`edit-task-time-h-${index}`).value;
+            const mVal = document.getElementById(`edit-task-time-m-${index}`).value;
+            const timeVal = `${hVal}:${mVal}`;
+            const titleVal = document.getElementById(`edit-task-title-${index}`).value;
+            const repeatTypeVal = document.getElementById(`edit-task-repeat-${index}`).value;
+            
+            if (timeVal && titleVal) {
+                const oldTask = tasks[index];
+                
+                // もし前の予定が「くりかえし」だったなら、くりかえしリストから消すよ
+                if (oldTask.repeatType === 'daily' || oldTask.repeatType === 'weekly' || oldTask.isRepeating) {
+                    repeatingTasks = repeatingTasks.filter(rt => rt.time !== oldTask.time || rt.title !== oldTask.title);
+                }
+
+                // 予定を新しく書き換えるよ
+                tasks[index] = {
+                    ...oldTask,
+                    time: timeVal,
+                    title: titleVal,
+                    repeatType: repeatTypeVal,
+                    notified: false // 変更されたら通知をリセットするよ
+                };
+
+                // もし新しい設定が「くりかえし」なら、リストに追加するよ
+                if (repeatTypeVal !== 'none') {
+                    repeatingTasks.push(tasks[index]);
+                }
+
+                tasks.sort((a, b) => a.time.localeCompare(b.time));
+                saveTasks();
+                saveRepeatingTasks();
+                editingTaskIndex = -1;
+                renderSchedule();
+            }
+        }
+
+        function deleteTaskDirect(event, index) {
+            event.stopPropagation();
+            activeTaskMenuIndex = -1;
+            deleteTask(index); // すでにある削除機能を使うよ
+        }
+
+        function toggleAddFormRepeatMenu(event) {
+            event.stopPropagation();
+            isAddFormRepeatMenuOpen = !isAddFormRepeatMenuOpen;
+            renderSchedule();
+        }
+
+        function setAddRepeatType(event, type) {
+            event.stopPropagation();
+            currentAddRepeatType = type;
+            isAddFormRepeatMenuOpen = false;
+            // カスタム設定なら、今日の日付をデフォルトにするよ
+            if (type === 'custom') {
+                const today = new Date();
+                currentAddCustomMonth = today.getMonth() + 1;
+                currentAddCustomDay = today.getDate();
+            }
+            // 毎曜日設定なら、今日の曜日をデフォルトにするよ
+            if (type === 'weekly') {
+                const todayDOW = new Date().getDay();
+                currentAddWeeklyDays = [false, false, false, false, false, false, false];
+                currentAddWeeklyDays[todayDOW] = true;
+            }
+            renderSchedule();
+        }
+
+        function toggleAddWeeklyDay(event, idx) {
+            event.stopPropagation();
+            currentAddWeeklyDays[idx] = !currentAddWeeklyDays[idx];
+            renderSchedule();
+        }
+
+        // 画面のどこかをクリックしたら、メニューを閉じる魔法だよ
         window.addEventListener('click', () => {
+            let needsRender = false;
             if (isGoalMenuOpen) {
                 isGoalMenuOpen = false;
+                needsRender = true;
+            }
+            if (activeTaskMenuIndex !== -1) {
+                activeTaskMenuIndex = -1;
+                needsRender = true;
+            }
+            if (isAddFormRepeatMenuOpen) {
+                isAddFormRepeatMenuOpen = false;
+                needsRender = true;
+            }
+            if (needsRender) {
                 renderSchedule();
             }
         });
