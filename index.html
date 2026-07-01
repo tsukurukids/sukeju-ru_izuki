@@ -199,25 +199,7 @@
 
         .nav-item span { font-size: 10px; display: block; margin-top: 4px; }
 
-        /* Season Selector (for preview only) */
-        .season-swatches {
-            position: absolute;
-            right: -100px;
-            top: 50%;
-            transform: translateY(-50%);
-            display: flex;
-            flex-direction: column;
-            gap: 15px;
-        }
 
-        .swatch {
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            cursor: pointer;
-            border: 3px solid white;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-        }
 
         /* Mockup Overlay */
         .mockup-img {
@@ -392,13 +374,12 @@
             100% { transform: scale(0) rotate(180deg); opacity: 0; }
         }
         @keyframes fallParticle {
-            0% { transform: translate(0, -50px) rotate(0deg); opacity: 0; }
-            10% { opacity: var(--p-opacity, 0.6); } /* JSで決めた透明度にするよ */
-            25% { transform: translate(60px, 200px) rotate(90deg); } /* 大きく揺らすよ */
-            50% { transform: translate(-60px, 400px) rotate(180deg); }
-            75% { transform: translate(60px, 600px) rotate(270deg); }
-            90% { opacity: var(--p-opacity, 0.6); }
-            100% { transform: translate(0, 800px) rotate(360deg); opacity: 0; }
+            0% { transform: translate(0, -20px) rotate(0deg) scale(0.9); opacity: 0; }
+            15% { opacity: var(--p-opacity, 0.7); }
+            30% { transform: translate(25px, 200px) rotate(30deg) scale(1); }
+            60% { transform: translate(-20px, 450px) rotate(-20deg) scale(0.95); }
+            85% { opacity: var(--p-opacity, 0.7); }
+            100% { transform: translate(15px, 800px) rotate(45deg) scale(0.9); opacity: 0; }
         }
 
         /* 予定を書くフォームが開いているときだけの全画面モードの設定だよ */
@@ -482,12 +463,7 @@
         </div>
     </div>
 
-    <div class="season-swatches">
-        <div class="swatch" style="background:#FF6B81;" onclick="changeTheme('spring')"></div>
-        <div class="swatch" style="background:#2E86DE;" onclick="changeTheme('summer')"></div>
-        <div class="swatch" style="background:#D35400;" onclick="changeTheme('autumn')"></div>
-        <div class="swatch" style="background:#4834D4;" onclick="changeTheme('winter')"></div>
-    </div>
+
 
     <script>
         /* --- データ管理の魔法（localStorage） --- */
@@ -1270,15 +1246,7 @@
 
         /* --- 3. 設定画面 --- */
         function renderSettings() {
-            const colors = ['#FFB7C5', '#4FC3F7', '#FF7043', '#9FA8DA', '#90EE90', '#FFD54F', '#BA68C8', '#2D3436'];
-            const bubbles = colors.map(c => `<div class="color-bubble" style="background:${c}" onclick="setMainColor('${c}')"></div>`).join('');
-            
             document.getElementById('main-content').innerHTML = `
-                <div style="background:var(--card-bg); border-radius:20px; padding:20px; margin-bottom:20px;">
-                    <div style="font-weight:700; margin-bottom:10px;">アプリの色を選ぼう</div>
-                    <div class="color-picker">${bubbles}</div>
-                </div>
-
                 <div style="background:var(--card-bg); border-radius:20px; padding:20px;">
                     <div style="font-weight:700; margin-bottom:16px;">サブ設定</div>
                     
@@ -1353,11 +1321,6 @@
         }
 
         function changeTheme(season) {
-            const labels = {
-                spring: '2026/04/10 (fri)', summer: '2026/08/15 (sat)',
-                autumn: '2026/10/22 (thu)', winter: '2026/12/24 (wed)'
-            };
-            
             // 季節に合わせて背景の色（クラス）を変える魔法
             const body = document.getElementById('body');
             body.classList.remove('theme-summer', 'theme-autumn', 'theme-winter');
@@ -1372,7 +1335,14 @@
                 winter:'#6C5CE7' 
             };
             setMainColor(colors[season]);
-            document.getElementById('date-label').innerText = labels[season];
+            
+            // 今日の正しい日付を表示するよ！
+            const today = new Date();
+            const year = today.getFullYear();
+            const month = String(today.getMonth() + 1).padStart(2, '0');
+            const day = String(today.getDate()).padStart(2, '0');
+            const dayOfWeekStr = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'][today.getDay()];
+            document.getElementById('date-label').innerText = `${year}/${month}/${day} (${dayOfWeekStr})`;
             
             // 季節のしるしを呼ぶよ！
             renderParticles(season);
@@ -1413,24 +1383,26 @@
                 
                 // 季節ごとの「形」と「色」を決めるよ
                 if (season === 'spring') {
-                    // 春：グラデーションのある桜の花びら
-                    p.style.background = isFar ? 'linear-gradient(#FF80AB, #FFB7C5)' : 'linear-gradient(#FF4081, #FF80AB)';
-                    p.style.borderRadius = '80% 0 80% 0';
+                    // 春：グラデーションのある大人の桜の花びら
+                    p.style.background = isFar ? 'linear-gradient(#FFF0F5, #FFB7C5)' : 'linear-gradient(#FFA6C9, #FFC0CB)';
+                    p.style.borderRadius = '50% 0 50% 0';
                 } else if (season === 'summer') {
-                    // 夏：マンガ風のキラキラシャボン玉
-                    p.style.background = 'radial-gradient(circle at 30% 30%, white 0%, rgba(255,255,255,0.1) 30%, rgba(135,206,250,0.5) 100%)';
-                    p.style.border = '1px solid rgba(255,255,255,0.8)';
+                    // 夏：上品なパールのシャボン玉
+                    p.style.background = 'radial-gradient(circle at 35% 35%, rgba(255,255,255,0.9) 0%, rgba(240,248,255,0.2) 40%, rgba(176,196,222,0.4) 100%)';
+                    p.style.border = '0.5px solid rgba(255,255,255,0.6)';
                     p.style.borderRadius = '50%';
                 } else if (season === 'autumn') {
-                    // 秋：紅葉した色とりどりの落ち葉
-                    const leafColors = [['#D35400', '#A04000'], ['#C0392B', '#922B21'], ['#F1C40F', '#D4AC0D']];
+                    // 秋：深みのあるシックなもみじ色
+                    const leafColors = [['#D35400', '#A04000'], ['#B03A2E', '#78281F'], ['#F39C12', '#B7950B']];
                     const set = leafColors[Math.floor(Math.random() * leafColors.length)];
                     p.style.background = `linear-gradient(45deg, ${set[0]}, ${set[1]})`;
                     p.style.borderRadius = '50% 0 50% 0';
                 } else {
-                    // 冬：キラキラした雪の結晶
-                    p.style.background = 'white';
-                    p.style.clipPath = 'polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%)';
+                    // 冬：きらめくダイヤモンドダスト（光の粒）
+                    p.style.background = 'radial-gradient(circle, rgba(255,255,255,0.9) 0%, rgba(255,255,255,0) 70%)';
+                    p.style.borderRadius = '50%';
+                    p.style.boxShadow = '0 0 8px rgba(255,255,255,0.8)';
+                    p.style.clipPath = 'none';
                 }
                 
                 if (isFar) {

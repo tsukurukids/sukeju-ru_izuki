@@ -199,24 +199,57 @@
 
         .nav-item span { font-size: 10px; display: block; margin-top: 4px; }
 
-        /* Season Selector (for preview only) */
-        .season-swatches {
-            position: absolute;
-            right: -100px;
-            top: 50%;
-            transform: translateY(-50%);
-            display: flex;
-            flex-direction: column;
-            gap: 15px;
-        }
 
-        .swatch {
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
+
+        /* 各予定の「⋮」メニューと編集ボタンのデザインだよ */
+        .task-menu-container {
+            position: relative;
+        }
+        .task-menu-btn {
+            background: none;
+            border: none;
+            font-size: 20px;
+            color: var(--text);
             cursor: pointer;
-            border: 3px solid white;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            padding: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0.6;
+            transition: var(--transition);
+        }
+        .task-menu-btn:hover { opacity: 1; }
+        .task-dropdown {
+            position: absolute;
+            right: 0;
+            top: 36px;
+            background: white;
+            border: 1px solid rgba(0,0,0,0.1);
+            border-radius: 12px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.1);
+            display: none;
+            flex-direction: column;
+            z-index: 50;
+            overflow: hidden;
+            width: 100px;
+        }
+        .task-dropdown.show {
+            display: flex;
+        }
+        .task-dropdown-item {
+            padding: 10px 12px;
+            font-size: 13px;
+            cursor: pointer;
+            text-align: left;
+            background: none;
+            border: none;
+            width: 100%;
+            transition: var(--transition);
+            color: var(--text);
+            font-weight: 600;
+        }
+        .task-dropdown-item:hover {
+            background: rgba(0,0,0,0.05);
         }
 
         /* Mockup Overlay */
@@ -392,13 +425,12 @@
             100% { transform: scale(0) rotate(180deg); opacity: 0; }
         }
         @keyframes fallParticle {
-            0% { transform: translate(0, -50px) rotate(0deg); opacity: 0; }
-            10% { opacity: var(--p-opacity, 0.6); } /* JSで決めた透明度にするよ */
-            25% { transform: translate(60px, 200px) rotate(90deg); } /* 大きく揺らすよ */
-            50% { transform: translate(-60px, 400px) rotate(180deg); }
-            75% { transform: translate(60px, 600px) rotate(270deg); }
-            90% { opacity: var(--p-opacity, 0.6); }
-            100% { transform: translate(0, 800px) rotate(360deg); opacity: 0; }
+            0% { transform: translate(0, -20px) rotate(0deg) scale(0.9); opacity: 0; }
+            15% { opacity: var(--p-opacity, 0.7); }
+            30% { transform: translate(25px, 200px) rotate(30deg) scale(1); }
+            60% { transform: translate(-20px, 450px) rotate(-20deg) scale(0.95); }
+            85% { opacity: var(--p-opacity, 0.7); }
+            100% { transform: translate(15px, 800px) rotate(45deg) scale(0.9); opacity: 0; }
         }
 
         /* 予定を書くフォームが開いているときだけの全画面モードの設定だよ */
@@ -482,15 +514,11 @@
         </div>
     </div>
 
-    <div class="season-swatches">
-        <div class="swatch" style="background:#FF6B81;" onclick="changeTheme('spring')"></div>
-        <div class="swatch" style="background:#2E86DE;" onclick="changeTheme('summer')"></div>
-        <div class="swatch" style="background:#D35400;" onclick="changeTheme('autumn')"></div>
-        <div class="swatch" style="background:#4834D4;" onclick="changeTheme('winter')"></div>
-    </div>
+
 
     <script>
         /* --- データ管理の魔法（localStorage） --- */
+<<<<<<< Updated upstream
         let tasks = [];
         try {
             tasks = JSON.parse(localStorage.getItem('tasks')) || [
@@ -510,6 +538,13 @@
             repeatingTasks = [];
         }
 
+=======
+        let tasks = JSON.parse(localStorage.getItem('tasks')) || [
+            { time: "09:00", title: "朝の散歩", info: "公園の入り口", notified: false }
+        ];
+        // 毎日のくりかえし予定をためておく場所だよ
+        let repeatingTasks = JSON.parse(localStorage.getItem('repeatingTasks')) || [];
+>>>>>>> Stashed changes
         // 消した予定をためておく場所（24時間で消えるよ）
         let deletedTasks = [];
         try {
@@ -558,7 +593,6 @@
         const lastDate = localStorage.getItem('lastDate'); // 前に開いたときの日付
         
         if (lastDate && lastDate !== todayStr) {
-            const todayDOW = new Date().getDay(); // 0:日, 1:月...6:土
             
             // 履歴に前日の予定（リセットされる予定）の文字だけを追加するよ
             tasks.forEach(t => {
@@ -642,6 +676,7 @@
         let isGoalEditing = false; // 今週の目標を編集しているかどうかの状態
         let isGoalMenuOpen = false; // 目標のメニュー（⋮）が開いているかどうかの状態
         let currentAlarmingTaskIndex = -1; // 今アラームが鳴っている予定の番号だよ
+<<<<<<< Updated upstream
         let alarmTimeout = null; // スケジュールのアラームを自動で止めるタイマーだよ
         let activeTaskMenuIndex = -1; // 今開いている予定メニュー（⋮）の番号だよ
         let editingTaskIndex = -1; // 今編集している予定の番号だよ
@@ -650,6 +685,10 @@
         let currentAddCustomMonth = 1; // カスタム設定で選んだ月だよ
         let currentAddCustomDay = 1; // カスタム設定で選んだ日だよ
         let currentAddWeeklyDays = [false, false, false, false, false, false, false]; // 毎曜日で選んだ曜日たちだよ (日~土)
+=======
+        let editingIndex = -1; // いま編集している予定の番号（-1のときは新しくつくるよ）
+        let activeMenuIndex = -1; // いま「⋮」メニューが開いている予定の番号だよ
+>>>>>>> Stashed changes
 
         /* --- 画面を表示する関数 --- */
         function showTab(tab) {
@@ -677,14 +716,30 @@
             const now = new Date();
             const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
             const currentDay = now.getDay(); // 0:日, 1:月, ...
+            // --- 予定の編集に合わせた値のセッティング ---
+            let editTitle = '';
+            let editRepeat = 'none';
+            let editSilent = false;
+            let editH = "09";
+            let editM = "00";
+            if (editingIndex !== -1) {
+                const task = tasks[editingIndex];
+                editTitle = task.title;
+                editRepeat = task.repeatType || 'none';
+                editSilent = !!task.isSilent;
+                [editH, editM] = task.time.split(':');
+            }
+
             // スクロールで時間を選べるように選択肢を自動で作るよ
             const hOptions = Array.from({length: 24}, (_, i) => {
                 const val = String(i).padStart(2, '0');
-                return `<option value="${val}">${val}</option>`;
+                const sel = val === editH ? 'selected' : '';
+                return `<option value="${val}" ${sel}>${val}</option>`;
             }).join('');
             const mOptions = Array.from({length: 60}, (_, i) => {
                 const val = String(i).padStart(2, '0');
-                return `<option value="${val}">${val}</option>`;
+                const sel = val === editM ? 'selected' : '';
+                return `<option value="${val}" ${sel}>${val}</option>`;
             }).join('');
 
             // 編集のときに使う時間えらびの選択肢をつくる魔法だよ
@@ -769,6 +824,13 @@
                                 <option value="daily" ${(task.repeatType === 'daily' || task.isRepeating) ? 'selected' : ''}>毎日</option>
                                 <option value="weekly" ${task.repeatType === 'weekly' ? 'selected' : ''}>毎曜日</option>
                             </select>
+                            <!-- アラームを消すスイッチ（チェックボックス）だよ -->
+                            <div style="width:100%; display:flex; align-items:center; justify-content:space-between; margin-top:5px; padding:0 5px;">
+                                <label style="display:flex; align-items:center; gap:6px; font-size:13px; cursor:pointer; font-weight:600; color:var(--text);">
+                                    <input type="checkbox" id="edit-task-alarm-mute-${index}" ${task.isSilent ? 'checked' : ''} style="width:16px; height:16px; accent-color:var(--primary);">
+                                    🔕 アラームを鳴らさない
+                                </label>
+                            </div>
                             <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 5px;">
                                 <button onclick="cancelEditTask(event)" style="padding: 8px 16px; border-radius: 12px; border: 2px solid var(--primary); background: white; color: var(--primary); font-weight: bold; font-size: 13px; cursor: pointer;">キャンセル</button>
                                 <button onclick="saveEditTask(event, ${index})" style="padding: 8px 16px; border-radius: 12px; border: none; background: var(--primary); color: white; font-weight: bold; font-size: 13px; cursor: pointer;">ほぞんする</button>
@@ -777,11 +839,12 @@
                     `;
                 }
                 
+                const isSilentIcon = task.isSilent ? '<span style="margin-left:5px;" title="アラームなし">🔕</span>' : '';
                 return `
                     <div class="task-card" style="animation-delay: ${index * 0.1}s">
                         <div class="task-time">${task.time}</div>
                         <div class="task-info">
-                            <div class="task-title">${(task.repeatType === 'daily' || task.isRepeating) ? '🔁 ' : ''}${task.repeatType === 'weekly' ? '📅 ' : ''}${task.title}</div>
+                            <div class="task-title">${(task.repeatType === 'daily' || task.isRepeating) ? '🔁 ' : ''}${task.repeatType === 'weekly' ? '📅 ' : ''}${task.title}${isSilentIcon}</div>
                             <div style="font-size:12px;opacity:0.6;">${task.info || '予定だよ'}</div>
                         </div>
                         <div style="position: relative; display: flex; align-items: center;">
@@ -809,7 +872,7 @@
                 ${weeklyHTML}
                 <div class="add-task-form">
                     <div style="width:100%; display:flex; justify-content:space-between; align-items:center; cursor:pointer;" onclick="toggleTaskForm()">
-                        <span style="font-weight:bold; color:var(--primary);">✏️ 予定を書く</span>
+                        <span style="font-weight:bold; color:var(--primary);">${editingIndex === -1 ? '✏️ 予定を書く' : '✏️ 予定を編集する'}</span>
                         <span style="color:var(--primary); font-weight:bold;">${isTaskFormOpen ? '▲' : '▼'}</span>
                     </div>
                     ${isTaskFormOpen ? `
@@ -835,6 +898,14 @@
                         </div>
                         
                         <button class="add-task-btn" onclick="addTask()">追加</button>
+
+                        <!-- アラームを消すスイッチ（チェックボックス）だよ -->
+                        <div style="width:100%; display:flex; align-items:center; justify-content:space-between; margin-top:5px; padding:0 5px;">
+                            <label style="display:flex; align-items:center; gap:6px; font-size:13px; cursor:pointer; font-weight:600; color:var(--text);">
+                                <input type="checkbox" id="task-alarm-mute" style="width:16px; height:16px; accent-color:var(--primary);">
+                                🔕 アラームを鳴らさない
+                            </label>
+                        </div>
 
                         ${currentAddRepeatType === 'weekly' ? `
                         <div style="width: 100%; display: flex; flex-direction: column; gap: 6px; margin-top: 8px; animation: fadeIn 0.3s ease-out; background: rgba(0,0,0,0.02); padding: 8px; border-radius: 12px;">
@@ -916,21 +987,51 @@
             c.style.display = c.style.display === 'none' ? 'block' : 'none';
         }
 
+        // メニューを開いたり閉じたりする魔法だよ
+        function toggleMenu(event, index) {
+            event.stopPropagation(); // ボタンを押したときに、他のクリックが動かないようにするよ
+            if (activeMenuIndex === index) {
+                activeMenuIndex = -1;
+            } else {
+                activeMenuIndex = index;
+            }
+            renderSchedule();
+        }
+
+        // 編集（書き直し）をはじめる魔法だよ
+        function startEditTask(index) {
+            editingIndex = index;
+            isTaskFormOpen = true; // フォームを自動で開くよ
+            activeMenuIndex = -1; // メニューは閉じるよ
+            renderSchedule();
+        }
+
+        // 編集をキャンセルする魔法だよ
+        function cancelEditTask() {
+            editingIndex = -1;
+            renderSchedule();
+        }
+
+        // 画面のどこかをクリックしたときに、開いているメニューを閉じる設定だよ
+        window.addEventListener('click', () => {
+            if (activeMenuIndex !== -1) {
+                activeMenuIndex = -1;
+                renderSchedule();
+            }
+        });
+
         function addTask() {
             const hVal = document.getElementById('task-time-h').value;
             const mVal = document.getElementById('task-time-m').value;
             const timeVal = `${hVal}:${mVal}`;
             const titleVal = document.getElementById('task-title').value;
             const repeatTypeVal = currentAddRepeatType; // くりかえしの種類
+            const isSilentVal = document.getElementById('task-alarm-mute').checked; // アラームなし設定
             
             // スケジュールの最大数を決めるよ（スイッチが入っていたら20個、入っていなかったら15個）
             const maxTasks = allowExtraTasks ? 20 : 15;
 
-            // スケジュールがいっぱいにならないようにチェックする魔法だよ！
-            if (tasks.length >= maxTasks) {
-                alert(`スケジュールは1日に${maxTasks}個までだよ。どれか消してから追加してね！`);
-                return; // 制限いっぱいなら、ここでストップして追加しないよ
-            }
+            if (!timeVal || !titleVal) return;
 
             if (timeVal && titleVal) {
                 const newTask = { 
@@ -938,6 +1039,7 @@
                     title: titleVal, 
                     notified: false, 
                     repeatType: repeatTypeVal,
+                    isSilent: isSilentVal,
                     dayOfWeek: new Date().getDay(), // 今日の曜日を保存しておくよ
                     weeklyDays: [...currentAddWeeklyDays], // えらんだ曜日たちだよ
                     customMonth: currentAddCustomMonth, // えらんだ月だよ
@@ -987,6 +1089,10 @@
                 renderSchedule();
                 updateFormMode();
             }
+
+            tasks.sort((a, b) => a.time.localeCompare(b.time));
+            saveTasks();
+            renderSchedule();
         }
 
         function deleteTask(index) {
@@ -1268,15 +1374,7 @@
 
         /* --- 3. 設定画面 --- */
         function renderSettings() {
-            const colors = ['#FFB7C5', '#4FC3F7', '#FF7043', '#9FA8DA', '#90EE90', '#FFD54F', '#BA68C8', '#2D3436'];
-            const bubbles = colors.map(c => `<div class="color-bubble" style="background:${c}" onclick="setMainColor('${c}')"></div>`).join('');
-            
             document.getElementById('main-content').innerHTML = `
-                <div style="background:var(--card-bg); border-radius:20px; padding:20px; margin-bottom:20px;">
-                    <div style="font-weight:700; margin-bottom:10px;">アプリの色を選ぼう</div>
-                    <div class="color-picker">${bubbles}</div>
-                </div>
-
                 <div style="background:var(--card-bg); border-radius:20px; padding:20px;">
                     <div style="font-weight:700; margin-bottom:16px;">サブ設定</div>
                     
@@ -1351,11 +1449,6 @@
         }
 
         function changeTheme(season) {
-            const labels = {
-                spring: '2026/04/10 (fri)', summer: '2026/08/15 (sat)',
-                autumn: '2026/10/22 (thu)', winter: '2026/12/24 (wed)'
-            };
-            
             // 季節に合わせて背景の色（クラス）を変える魔法
             const body = document.getElementById('body');
             body.classList.remove('theme-summer', 'theme-autumn', 'theme-winter');
@@ -1370,7 +1463,14 @@
                 winter:'#6C5CE7' 
             };
             setMainColor(colors[season]);
-            document.getElementById('date-label').innerText = labels[season];
+            
+            // 今日の正しい日付を表示するよ！
+            const today = new Date();
+            const year = today.getFullYear();
+            const month = String(today.getMonth() + 1).padStart(2, '0');
+            const day = String(today.getDate()).padStart(2, '0');
+            const dayOfWeekStr = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'][today.getDay()];
+            document.getElementById('date-label').innerText = `${year}/${month}/${day} (${dayOfWeekStr})`;
             
             // 季節のしるしを呼ぶよ！
             renderParticles(season);
@@ -1411,24 +1511,26 @@
                 
                 // 季節ごとの「形」と「色」を決めるよ
                 if (season === 'spring') {
-                    // 春：グラデーションのある桜の花びら
-                    p.style.background = isFar ? 'linear-gradient(#FF80AB, #FFB7C5)' : 'linear-gradient(#FF4081, #FF80AB)';
-                    p.style.borderRadius = '80% 0 80% 0';
+                    // 春：グラデーションのある大人の桜の花びら
+                    p.style.background = isFar ? 'linear-gradient(#FFF0F5, #FFB7C5)' : 'linear-gradient(#FFA6C9, #FFC0CB)';
+                    p.style.borderRadius = '50% 0 50% 0';
                 } else if (season === 'summer') {
-                    // 夏：マンガ風のキラキラシャボン玉
-                    p.style.background = 'radial-gradient(circle at 30% 30%, white 0%, rgba(255,255,255,0.1) 30%, rgba(135,206,250,0.5) 100%)';
-                    p.style.border = '1px solid rgba(255,255,255,0.8)';
+                    // 夏：上品なパールのシャボン玉
+                    p.style.background = 'radial-gradient(circle at 35% 35%, rgba(255,255,255,0.9) 0%, rgba(240,248,255,0.2) 40%, rgba(176,196,222,0.4) 100%)';
+                    p.style.border = '0.5px solid rgba(255,255,255,0.6)';
                     p.style.borderRadius = '50%';
                 } else if (season === 'autumn') {
-                    // 秋：紅葉した色とりどりの落ち葉
-                    const leafColors = [['#D35400', '#A04000'], ['#C0392B', '#922B21'], ['#F1C40F', '#D4AC0D']];
+                    // 秋：深みのあるシックなもみじ色
+                    const leafColors = [['#D35400', '#A04000'], ['#B03A2E', '#78281F'], ['#F39C12', '#B7950B']];
                     const set = leafColors[Math.floor(Math.random() * leafColors.length)];
                     p.style.background = `linear-gradient(45deg, ${set[0]}, ${set[1]})`;
                     p.style.borderRadius = '50% 0 50% 0';
                 } else {
-                    // 冬：キラキラした雪の結晶
-                    p.style.background = 'white';
-                    p.style.clipPath = 'polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%)';
+                    // 冬：きらめくダイヤモンドダスト（光の粒）
+                    p.style.background = 'radial-gradient(circle, rgba(255,255,255,0.9) 0%, rgba(255,255,255,0) 70%)';
+                    p.style.borderRadius = '50%';
+                    p.style.boxShadow = '0 0 8px rgba(255,255,255,0.8)';
+                    p.style.clipPath = 'none';
                 }
                 
                 if (isFar) {
@@ -1515,6 +1617,10 @@
 
             tasks.forEach((task, index) => {
                 if (task.time === alertStr && !task.notified) {
+                    if (task.isSilent) {
+                        task.notified = true; // 鳴らさない設定の時は、アラーム音は出さずに通知済みにするよ
+                        return;
+                    }
                     currentAlarmingTaskIndex = index; // どの予定か覚えさせるよ
                     showAlarm(task.title);
                     task.notified = true;
@@ -1687,6 +1793,7 @@
             const timeVal = `${hVal}:${mVal}`;
             const titleVal = document.getElementById(`edit-task-title-${index}`).value;
             const repeatTypeVal = document.getElementById(`edit-task-repeat-${index}`).value;
+            const isSilentVal = document.getElementById(`edit-task-alarm-mute-${index}`) ? document.getElementById(`edit-task-alarm-mute-${index}`).checked : false; // アラームなし設定
             
             if (timeVal && titleVal) {
                 const oldTask = tasks[index];
@@ -1702,6 +1809,7 @@
                     time: timeVal,
                     title: titleVal,
                     repeatType: repeatTypeVal,
+                    isSilent: isSilentVal,
                     notified: false // 変更されたら通知をリセットするよ
                 };
 
